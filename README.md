@@ -42,28 +42,6 @@ Set a password:
 YESOD_PASSWORD='change-me' docker compose up -d
 ```
 
-Use a custom database path when running the binary directly:
-
-```bash
-YESOD_DB=./data/yesod.db ./yesod
-```
-
-## Local Development
-
-```bash
-cd web && npm install && cd ..
-make dev
-```
-
-The app runs at `http://localhost:5173` and proxies API requests to `:8080`.
-
-## Build
-
-```bash
-make build
-./yesod
-```
-
 ## License
 
 MIT
