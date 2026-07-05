@@ -24,6 +24,16 @@ Open `http://localhost:8080`.
 
 Data is stored in `./data/yesod.db`.
 
+Or run the published image:
+
+```bash
+docker run -d \
+  --name yesod \
+  -p 8080:8080 \
+  -v "$PWD/data:/data" \
+  ghcr.io/newfull5/yesod:v0.1.0
+```
+
 ## Settings
 
 Set a password:
