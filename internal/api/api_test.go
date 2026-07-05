@@ -3,10 +3,12 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/newfull5/yesod/internal/db"
@@ -99,6 +101,13 @@ type issueResp struct {
 	} `json:"comments"`
 }
 
+func createPerson(t *testing.T, h http.Handler, name string) int64 {
+	t.Helper()
+	rec := do(t, h, "POST", "/api/people", map[string]any{"name": name})
+	wantStatus(t, rec, http.StatusCreated)
+	return int64(parse[map[string]any](t, rec)["id"].(float64))
+}
+
 func createIssue(t *testing.T, h http.Handler, body map[string]any) issueResp {
 	t.Helper()
 	if _, ok := body["project_id"]; !ok {
@@ -154,7 +163,8 @@ func TestIssueCRUDAndKeySequence(t *testing.T) {
 	wantStatus(t, do(t, h, "POST", "/api/issues/YS-1/links", map[string]any{"linked_key": "YS-3", "link_type": "blocks"}), http.StatusConflict)
 	wantStatus(t, do(t, h, "POST", "/api/issues/YS-1/links", map[string]any{"linked_key": "YS-1", "link_type": "blocks"}), http.StatusBadRequest)
 	wantStatus(t, do(t, h, "POST", "/api/issues/YS-1/links", map[string]any{"linked_key": "YS-3", "link_type": "nope"}), http.StatusBadRequest)
-	wantStatus(t, do(t, h, "POST", "/api/issues/YS-1/comments", map[string]any{"body": "hello", "author_id": 1}), http.StatusCreated)
+	author := createPerson(t, h, "Commenter")
+	wantStatus(t, do(t, h, "POST", "/api/issues/YS-1/comments", map[string]any{"body": "hello", "author_id": author}), http.StatusCreated)
 
 	rec := do(t, h, "GET", "/api/issues/YS-1", nil)
 	wantStatus(t, rec, http.StatusOK)
@@ -167,6 +177,14 @@ func TestIssueCRUDAndKeySequence(t *testing.T) {
 	}
 	if len(detail.Comments) != 1 || detail.Comments[0].Body != "hello" {
 		t.Errorf("comments = %+v, want [hello]", detail.Comments)
+	}
+
+	// The link is visible from the far side too, under its inverse type.
+	rec = do(t, h, "GET", "/api/issues/YS-3", nil)
+	wantStatus(t, rec, http.StatusOK)
+	far := parse[issueResp](t, rec)
+	if got := far.Links["is blocked by"]; len(got) != 1 || got[0].Key != "YS-1" {
+		t.Errorf(`YS-3 links["is blocked by"] = %+v, want [YS-1]`, got)
 	}
 
 	// Link delete.
@@ -254,7 +272,8 @@ func TestPositionEndpoint(t *testing.T) {
 
 func TestPartialPatch(t *testing.T) {
 	h := setup(t)
-	createIssue(t, h, map[string]any{"title": "Patch me", "assignee_id": 1, "description": "keep me"})
+	assignee := createPerson(t, h, "Assignee")
+	createIssue(t, h, map[string]any{"title": "Patch me", "assignee_id": assignee, "description": "keep me"})
 
 	// Create a sprint for sprint_ids replace.
 	rec := do(t, h, "POST", "/api/sprints", map[string]any{"project_id": 1, "name": "Sprint 1"})
@@ -268,7 +287,7 @@ func TestPartialPatch(t *testing.T) {
 	if got.Title != "Renamed" {
 		t.Errorf("title = %q, want Renamed", got.Title)
 	}
-	if got.Assignee == nil || got.Assignee.ID != 1 {
+	if got.Assignee == nil || got.Assignee.ID != assignee {
 		t.Errorf("assignee lost on partial patch: %+v", got.Assignee)
 	}
 	if got.Description == nil || *got.Description != "keep me" {
@@ -314,15 +333,14 @@ func TestPartialPatch(t *testing.T) {
 
 func TestFilters(t *testing.T) {
 	h := setup(t)
-	rec := do(t, h, "POST", "/api/people", map[string]any{"name": "Alice"})
-	wantStatus(t, rec, http.StatusCreated)
-	alice := int64(parse[map[string]any](t, rec)["id"].(float64))
-	rec = do(t, h, "POST", "/api/sprints", map[string]any{"project_id": 1, "name": "Sprint 1"})
+	alice := createPerson(t, h, "Alice")
+	bob := createPerson(t, h, "Bob")
+	rec := do(t, h, "POST", "/api/sprints", map[string]any{"project_id": 1, "name": "Sprint 1"})
 	wantStatus(t, rec, http.StatusCreated)
 	sprintID := int64(parse[map[string]any](t, rec)["id"].(float64))
 
 	createIssue(t, h, map[string]any{"title": "Fix login bug", "type_id": 2, "assignee_id": alice, "sprint_ids": []int64{sprintID}})
-	createIssue(t, h, map[string]any{"title": "Write docs", "type_id": 3, "assignee_id": 1})
+	createIssue(t, h, map[string]any{"title": "Write docs", "type_id": 3, "assignee_id": bob})
 	createIssue(t, h, map[string]any{"title": "Login page polish", "type_id": 1, "status_id": 2})
 
 	cases := []struct {
@@ -366,13 +384,14 @@ func itoa(v int64) string {
 
 func TestComments(t *testing.T) {
 	h := setup(t)
+	author := createPerson(t, h, "Commenter")
 	createIssue(t, h, map[string]any{"title": "Discuss"})
 
-	rec := do(t, h, "POST", "/api/issues/YS-1/comments", map[string]any{"body": "first", "author_id": 1})
+	rec := do(t, h, "POST", "/api/issues/YS-1/comments", map[string]any{"body": "first", "author_id": author})
 	wantStatus(t, rec, http.StatusCreated)
 	c := parse[map[string]any](t, rec)
-	if author, _ := c["author"].(map[string]any); author == nil || author["name"] != "Saechan" {
-		t.Errorf("comment author = %v, want Saechan", c["author"])
+	if a, _ := c["author"].(map[string]any); a == nil || a["name"] != "Commenter" {
+		t.Errorf("comment author = %v, want Commenter", c["author"])
 	}
 	wantStatus(t, do(t, h, "POST", "/api/issues/YS-1/comments", map[string]any{"body": "anonymous"}), http.StatusCreated)
 
@@ -391,6 +410,68 @@ func TestComments(t *testing.T) {
 	}
 	if list[1]["author"] != nil {
 		t.Errorf("anonymous comment author = %v, want null", list[1]["author"])
+	}
+}
+
+// Regression test for the board_order race: concurrent position/status
+// changes into the same column must never compute the same board_order
+// (see internal/api/issues.go positionIssue/patchIssue).
+func TestConcurrentMovesNeverDuplicateBoardOrder(t *testing.T) {
+	h := setup(t)
+	const n = 8
+	for i := 0; i < n; i++ {
+		createIssue(t, h, map[string]any{"title": fmt.Sprintf("issue %d", i)}) // YS-1..YS-n in To Do (1)
+	}
+
+	var wg sync.WaitGroup
+	for i := 1; i <= n; i++ {
+		wg.Add(1)
+		key := fmt.Sprintf("YS-%d", i)
+		go func(key string) {
+			defer wg.Done()
+			// Split across the two write paths that both place a card at the
+			// bottom of a column: PATCH .../position and PATCH status_id.
+			var rec *httptest.ResponseRecorder
+			if key == "YS-1" || key == "YS-3" {
+				rec = do(t, h, "PATCH", "/api/issues/"+key, map[string]any{"status_id": 2})
+			} else {
+				rec = do(t, h, "PATCH", "/api/issues/"+key+"/position", map[string]any{"status_id": 2})
+			}
+			if rec.Code != http.StatusOK {
+				t.Errorf("move %s: status = %d, body: %s", key, rec.Code, rec.Body.String())
+			}
+		}(key)
+	}
+	wg.Wait()
+
+	rec := do(t, h, "GET", "/api/board?project_id=1", nil)
+	wantStatus(t, rec, http.StatusOK)
+	var board struct {
+		Columns []struct {
+			ID     int64 `json:"id"`
+			Issues []struct {
+				Key        string  `json:"key"`
+				BoardOrder float64 `json:"board_order"`
+			} `json:"issues"`
+		} `json:"columns"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &board); err != nil {
+		t.Fatalf("unmarshal board: %v", err)
+	}
+	for _, col := range board.Columns {
+		if col.ID != 2 {
+			continue
+		}
+		if len(col.Issues) != n {
+			t.Fatalf("column has %d issues, want %d: %+v", len(col.Issues), n, col.Issues)
+		}
+		seen := map[float64]string{}
+		for _, is := range col.Issues {
+			if other, dup := seen[is.BoardOrder]; dup {
+				t.Fatalf("duplicate board_order %v: %s and %s", is.BoardOrder, other, is.Key)
+			}
+			seen[is.BoardOrder] = is.Key
+		}
 	}
 }
 

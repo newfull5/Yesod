@@ -27,6 +27,7 @@ export type Card = {
   start_date: string | null
   due_date: string | null
   board_order: number
+  sprint_ids: number[]
   created_at: string
   updated_at: string
 }

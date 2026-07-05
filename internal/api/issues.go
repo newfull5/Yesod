@@ -47,6 +47,7 @@ type issueCard struct {
 	StartDate  *string    `json:"start_date"`
 	DueDate    *string    `json:"due_date"`
 	BoardOrder float64    `json:"board_order"`
+	SprintIDs  []int64    `json:"sprint_ids"`
 	CreatedAt  string     `json:"created_at"`
 	UpdatedAt  string     `json:"updated_at"`
 }
@@ -100,11 +101,27 @@ const cardSelect = `SELECT i.id, i.key, i.project_id, i.title,
 	i.type_id, t.name, t.icon,
 	i.status_id, st.name, st.category,
 	i.assignee_id, a.name, a.avatar_color,
-	i.parent_id, i.start_date, i.due_date, i.board_order, i.created_at, i.updated_at
+	i.parent_id, i.start_date, i.due_date, i.board_order,
+	(SELECT group_concat(sprint_id) FROM issue_sprints WHERE issue_id = i.id) AS sprint_ids,
+	i.created_at, i.updated_at
 	FROM issues i
 	JOIN statuses st ON st.id = i.status_id
 	LEFT JOIN issue_types t ON t.id = i.type_id
 	LEFT JOIN people a ON a.id = i.assignee_id `
+
+// parseIDList parses a group_concat(id) column ("3,7,9") into []int64.
+func parseIDList(s sql.NullString) []int64 {
+	out := make([]int64, 0)
+	if !s.Valid || s.String == "" {
+		return out
+	}
+	for _, part := range strings.Split(s.String, ",") {
+		if id, err := strconv.ParseInt(part, 10, 64); err == nil {
+			out = append(out, id)
+		}
+	}
+	return out
+}
 
 func (s *server) queryCards(where, order string, args ...any) ([]issueCard, error) {
 	rows, err := s.db.Query(cardSelect+where+" "+order, args...)
@@ -116,13 +133,13 @@ func (s *server) queryCards(where, order string, args ...any) ([]issueCard, erro
 	for rows.Next() {
 		var c issueCard
 		var typeID, assigneeID, parentID sql.NullInt64
-		var typeName, typeIcon, aName, aColor, startDate, dueDate sql.NullString
+		var typeName, typeIcon, aName, aColor, startDate, dueDate, sprintIDs sql.NullString
 		var bo sql.NullFloat64
 		if err := rows.Scan(&c.ID, &c.Key, &c.ProjectID, &c.Title,
 			&typeID, &typeName, &typeIcon,
 			&c.Status.ID, &c.Status.Name, &c.Status.Category,
 			&assigneeID, &aName, &aColor,
-			&parentID, &startDate, &dueDate, &bo, &c.CreatedAt, &c.UpdatedAt); err != nil {
+			&parentID, &startDate, &dueDate, &bo, &sprintIDs, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, err
 		}
 		if typeID.Valid {
@@ -135,6 +152,7 @@ func (s *server) queryCards(where, order string, args ...any) ([]issueCard, erro
 		c.StartDate = nullStr(startDate)
 		c.DueDate = nullStr(dueDate)
 		c.BoardOrder = bo.Float64
+		c.SprintIDs = parseIDList(sprintIDs)
 		cards = append(cards, c)
 	}
 	return cards, rows.Err()
@@ -212,6 +230,10 @@ func (s *server) getIssueDetail(key string) (*issueDetail, error) {
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+	d.SprintIDs = make([]int64, len(d.Sprints))
+	for i, sr := range d.Sprints {
+		d.SprintIDs[i] = sr.ID
+	}
 
 	d.Subtasks = make([]subtask, 0)
 	rows, err = s.db.Query(`SELECT c.key, c.title, st.id, st.name, st.category
@@ -233,8 +255,18 @@ func (s *server) getIssueDetail(key string) (*issueDetail, error) {
 	}
 
 	d.Links = map[string][]linkTarget{}
-	rows, err = s.db.Query(`SELECT l.link_type, li.key, li.title FROM issue_links l
-		JOIN issues li ON li.id = l.linked_issue_id WHERE l.issue_id = ? ORDER BY li.id`, d.ID)
+	// Union in the reverse side too, mapping each link_type to its inverse
+	// ("blocks" <-> "is blocked by"; "relates to" is its own inverse) so a
+	// link written from one issue is also visible from the other side.
+	rows, err = s.db.Query(`
+		SELECT link_type, key, title FROM (
+			SELECT l.link_type AS link_type, li.key AS key, li.title AS title, li.id AS ord
+			FROM issue_links l JOIN issues li ON li.id = l.linked_issue_id WHERE l.issue_id = ?
+			UNION ALL
+			SELECT CASE l.link_type WHEN 'blocks' THEN 'is blocked by' WHEN 'is blocked by' THEN 'blocks' ELSE l.link_type END,
+				li.key, li.title, li.id
+			FROM issue_links l JOIN issues li ON li.id = l.issue_id WHERE l.linked_issue_id = ?
+		) ORDER BY ord`, d.ID, d.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -512,6 +544,7 @@ func (s *server) patchIssue(w http.ResponseWriter, r *http.Request) {
 
 	sets := make([]string, 0, 8)
 	args := make([]any, 0, 8)
+	var statusChange *int64
 
 	if v, present := body["title"]; present {
 		t, isStr := v.(string)
@@ -594,13 +627,7 @@ func (s *server) patchIssue(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if id != curStatus {
-			order, err := db.BottomBoardOrder(s.db, id)
-			if err != nil {
-				dbErr(w, err)
-				return
-			}
-			sets = append(sets, "status_id = ?", "board_order = ?")
-			args = append(args, id, order)
+			statusChange = &id
 		}
 	}
 	if v, present := body["parent_id"]; present {
@@ -659,7 +686,7 @@ func (s *server) patchIssue(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if len(sets) == 0 && !haveSprints {
+	if len(sets) == 0 && statusChange == nil && !haveSprints {
 		writeErr(w, http.StatusBadRequest, "no updatable fields in request body")
 		return
 	}
@@ -670,6 +697,18 @@ func (s *server) patchIssue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback()
+	// board_order is computed from inside the transaction (which, thanks to
+	// _txlock=immediate, already holds the write lock) so a concurrent status
+	// change can never read the same stale MAX(board_order).
+	if statusChange != nil {
+		order, err := db.BottomBoardOrder(tx, *statusChange)
+		if err != nil {
+			dbErr(w, err)
+			return
+		}
+		sets = append(sets, "status_id = ?", "board_order = ?")
+		args = append(args, *statusChange, order)
+	}
 	if len(sets) > 0 {
 		sets = append(sets, "updated_at = datetime('now')")
 		args = append(args, issueID)
@@ -757,11 +796,22 @@ func (s *server) positionIssue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The whole read-compute-write sequence runs inside one transaction so
+	// concurrent drops (web + MCP) can't both read the same MAX/MIN(board_order)
+	// snapshot and write duplicate positions; _txlock=immediate makes db.Begin
+	// grab SQLite's write lock up front, serializing these transactions.
+	tx, err := s.db.Begin()
+	if err != nil {
+		dbErr(w, err)
+		return
+	}
+	defer tx.Rollback()
+
 	var newOrder float64
 	if req.AfterKey != nil {
 		var afterID, afterStatus, afterProject int64
 		var afterOrder float64
-		err := s.db.QueryRow(`SELECT id, status_id, project_id, COALESCE(board_order, 0) FROM issues WHERE key = ?`,
+		err := tx.QueryRow(`SELECT id, status_id, project_id, COALESCE(board_order, 0) FROM issues WHERE key = ?`,
 			*req.AfterKey).Scan(&afterID, &afterStatus, &afterProject, &afterOrder)
 		if err == sql.ErrNoRows {
 			writeErr(w, http.StatusBadRequest, "unknown after_key")
@@ -780,7 +830,7 @@ func (s *server) positionIssue(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		var next sql.NullFloat64
-		if err := s.db.QueryRow(`SELECT MIN(board_order) FROM issues WHERE status_id = ? AND board_order > ? AND id != ?`,
+		if err := tx.QueryRow(`SELECT MIN(board_order) FROM issues WHERE status_id = ? AND board_order > ? AND id != ?`,
 			req.StatusID, afterOrder, issueID).Scan(&next); err != nil {
 			dbErr(w, err)
 			return
@@ -793,7 +843,7 @@ func (s *server) positionIssue(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		var min sql.NullFloat64
-		if err := s.db.QueryRow(`SELECT MIN(board_order) FROM issues WHERE status_id = ? AND id != ?`,
+		if err := tx.QueryRow(`SELECT MIN(board_order) FROM issues WHERE status_id = ? AND id != ?`,
 			req.StatusID, issueID).Scan(&min); err != nil {
 			dbErr(w, err)
 			return
@@ -805,8 +855,12 @@ func (s *server) positionIssue(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if _, err := s.db.Exec(`UPDATE issues SET status_id = ?, board_order = ?, updated_at = datetime('now') WHERE id = ?`,
+	if _, err := tx.Exec(`UPDATE issues SET status_id = ?, board_order = ?, updated_at = datetime('now') WHERE id = ?`,
 		req.StatusID, newOrder, issueID); err != nil {
+		dbErr(w, err)
+		return
+	}
+	if err := tx.Commit(); err != nil {
 		dbErr(w, err)
 		return
 	}

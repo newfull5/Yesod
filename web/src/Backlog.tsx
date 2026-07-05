@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { DndContext, PointerSensor, useDraggable, useDroppable, useSensor, useSensors } from '@dnd-kit/core'
 import type { DragEndEvent } from '@dnd-kit/core'
 import { api } from './api'
-import type { Card, Sprint } from './api'
+import type { Card, Detail, Sprint } from './api'
 import { Avatar, DueBadge, TypeIcon } from './ui'
 
 type Props = {
@@ -12,12 +12,8 @@ type Props = {
   onOpen: (key: string) => void
 }
 
-// issue id -> sprint ids it belongs to
-type Membership = Record<number, number[]>
-
 export default function Backlog({ projectId, sprints, version, onOpen }: Props) {
   const [issues, setIssues] = useState<Card[] | null>(null)
-  const [memb, setMemb] = useState<Membership>({})
   const [error, setError] = useState('')
   const justDragged = useRef(false)
 
@@ -25,46 +21,43 @@ export default function Backlog({ projectId, sprints, version, onOpen }: Props) 
 
   useEffect(() => {
     let dead = false
-    ;(async () => {
-      // Card shape carries no sprint info; fetch each sprint's issue list for membership.
-      const [all, ...perSprint] = await Promise.all([
-        api<Card[]>(`/issues?project_id=${projectId}`),
-        ...sprints.map((s) => api<Card[]>(`/issues?project_id=${projectId}&sprint=${s.id}`)),
-      ])
-      if (dead) return
-      const m: Membership = {}
-      sprints.forEach((s, i) => {
-        for (const c of perSprint[i]) (m[c.id] ??= []).push(s.id)
+    api<Card[]>(`/issues?project_id=${projectId}`)
+      .then((all) => {
+        if (dead) return
+        setIssues(all)
+        setError('')
       })
-      setIssues(all)
-      setMemb(m)
-      setError('')
-    })().catch((e: Error) => setError(e.message))
+      .catch((e: Error) => setError(e.message))
     return () => {
       dead = true
     }
-  }, [projectId, sprints, version])
+  }, [projectId, version])
 
-  function onDragEnd(e: DragEndEvent) {
+  async function onDragEnd(e: DragEndEvent) {
     setTimeout(() => {
       justDragged.current = false
     }, 0)
     const { active, over } = e
-    if (!over) return
+    if (!over || !issues) return
     const data = active.data.current as { issueId: number; key: string; from: number | null }
     const to = over.id === 'backlog' ? null : Number(String(over.id).slice(1))
     if (data.from === to) return
-    const cur = memb[data.issueId] ?? []
-    let next = cur.filter((id) => id !== data.from)
-    if (to != null && !next.includes(to)) next = [...next, to]
-    const prev = memb
-    setMemb({ ...memb, [data.issueId]: next }) // optimistic
-    api(`/issues/${data.key}`, 'PATCH', { sprint_ids: next })
-      .then(() => setError(''))
-      .catch((er: Error) => {
-        setMemb(prev)
-        setError(er.message)
-      })
+    const prev = issues
+    try {
+      // Re-fetch the issue's current sprint membership right before building
+      // the replacement set: our local copy can be stale (e.g. an MCP client
+      // changed it since load), and sprint_ids PATCHes replace the whole set —
+      // sending a stale one would silently revert the other client's change.
+      const fresh = await api<Detail>(`/issues/${data.key}`)
+      let next = fresh.sprints.map((s) => s.id).filter((id) => id !== data.from)
+      if (to != null && !next.includes(to)) next = [...next, to]
+      setIssues(issues.map((i) => (i.id === data.issueId ? { ...i, sprint_ids: next } : i))) // optimistic
+      await api(`/issues/${data.key}`, 'PATCH', { sprint_ids: next })
+      setError('')
+    } catch (err) {
+      setIssues(prev)
+      setError(err instanceof Error ? err.message : 'Move failed')
+    }
   }
 
   const open = (key: string) => {
@@ -74,8 +67,8 @@ export default function Backlog({ projectId, sprints, version, onOpen }: Props) 
 
   if (!issues) return <div className="center-msg">{error || 'Loading backlog…'}</div>
 
-  const inSprint = (sprintId: number) => issues.filter((i) => memb[i.id]?.includes(sprintId))
-  const unassigned = issues.filter((i) => !memb[i.id]?.length)
+  const inSprint = (sprintId: number) => issues.filter((i) => i.sprint_ids.includes(sprintId))
+  const unassigned = issues.filter((i) => i.sprint_ids.length === 0)
 
   return (
     <div className="backlog">

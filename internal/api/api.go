@@ -19,6 +19,7 @@ import (
 type server struct {
 	db       *sql.DB
 	password string // empty = auth disabled
+	me       string // YESOD_ME: name of the person "assign to me" targets; empty = unconfigured
 
 	mu       sync.Mutex
 	sessions map[string]struct{} // ponytail: in-memory, cleared on restart; fine for one user
@@ -27,11 +28,12 @@ type server struct {
 // RegisterRoutes mounts all /api handlers on mux. When YESOD_PASSWORD is set,
 // every /api route except POST /api/login requires a session cookie.
 func RegisterRoutes(mux *http.ServeMux, d *sql.DB) {
-	s := &server{db: d, password: os.Getenv("YESOD_PASSWORD"), sessions: map[string]struct{}{}}
+	s := &server{db: d, password: os.Getenv("YESOD_PASSWORD"), me: os.Getenv("YESOD_ME"), sessions: map[string]struct{}{}}
 
 	api := http.NewServeMux()
 	api.HandleFunc("POST /api/login", s.login)
 
+	api.HandleFunc("GET /api/meta", s.meta)
 	api.HandleFunc("GET /api/projects", s.listProjects)
 	api.HandleFunc("POST /api/projects", s.createProject)
 	api.HandleFunc("GET /api/board", s.board)
@@ -98,6 +100,7 @@ func (s *server) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if subtle.ConstantTimeCompare([]byte(req.Password), []byte(s.password)) != 1 {
+		time.Sleep(500 * time.Millisecond) // throttle brute-force guessing
 		writeErr(w, http.StatusUnauthorized, "invalid password")
 		return
 	}
@@ -115,9 +118,32 @@ func (s *server) login(w http.ResponseWriter, r *http.Request) {
 		Value:    token,
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https",
 		SameSite: http.SameSiteLaxMode,
 	})
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// meta reports server-side configuration the web UI needs but can't discover
+// itself, currently just the YESOD_ME person (nil if unset or unmatched).
+func (s *server) meta(w http.ResponseWriter, r *http.Request) {
+	out := struct {
+		Me *personRef `json:"me"`
+	}{}
+	if s.me != "" {
+		var p personRef
+		var color sql.NullString
+		err := s.db.QueryRow(`SELECT id, name, avatar_color FROM people WHERE name = ?`, s.me).Scan(&p.ID, &p.Name, &color)
+		if err != nil && err != sql.ErrNoRows {
+			dbErr(w, err)
+			return
+		}
+		if err == nil {
+			p.AvatarColor = nullStr(color)
+			out.Me = &p
+		}
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 // --- shared helpers ---

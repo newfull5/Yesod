@@ -13,7 +13,8 @@ func TestOpenAppliesSchemaAndSeedsOnce(t *testing.T) {
 		if err != nil {
 			t.Fatalf("open #%d: %v", i+1, err)
 		}
-		counts := map[string]int{"projects": 1, "statuses": 3, "issue_types": 4, "people": 1}
+		// people is seeded empty: no hardcoded person name (YESOD_ME picks one at runtime).
+		counts := map[string]int{"projects": 1, "statuses": 3, "issue_types": 4, "people": 0}
 		for table, want := range counts {
 			var got int
 			if err := d.QueryRow("SELECT count(*) FROM " + table).Scan(&got); err != nil {

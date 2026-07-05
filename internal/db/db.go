@@ -16,7 +16,11 @@ var schema string
 // busy_timeout=5000 and foreign keys enforced, applies the schema on
 // first run (tracked via PRAGMA user_version) and seeds default data.
 func Open(path string) (*sql.DB, error) {
-	dsn := fmt.Sprintf("file:%s?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)", path)
+	// _txlock=immediate: every db.Begin() acquires SQLite's write lock at BEGIN
+	// time (instead of lazily on the first write), so concurrent read-compute-write
+	// sequences (e.g. board_order placement) fully serialize instead of both
+	// reading the same stale snapshot before writing.
+	dsn := fmt.Sprintf("file:%s?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)&_txlock=immediate", path)
 	d, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, err
@@ -68,10 +72,7 @@ func seed(tx *sql.Tx) error {
 		(?, 'Done', 'done', 3)`, pid, pid, pid); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(`INSERT INTO issue_types (name, icon) VALUES
-		('Story', 'story'), ('Bug', 'bug'), ('Task', 'task'), ('Epic', 'epic')`); err != nil {
-		return err
-	}
-	_, err = tx.Exec(`INSERT INTO people (name, avatar_color) VALUES ('Saechan', '#7c3aed')`)
+	_, err = tx.Exec(`INSERT INTO issue_types (name, icon) VALUES
+		('Story', 'story'), ('Bug', 'bug'), ('Task', 'task'), ('Epic', 'epic')`)
 	return err
 }

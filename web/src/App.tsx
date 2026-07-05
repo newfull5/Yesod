@@ -18,6 +18,7 @@ export default function App() {
   const [teams, setTeams] = useState<Team[]>([])
   const [sprints, setSprints] = useState<Sprint[]>([])
   const [statuses, setStatuses] = useState<Status[]>([])
+  const [me, setMe] = useState<Person | null>(null)
   const [filters, setFilters] = useState<Filters>(NO_FILTERS)
   const [view, setView] = useState<'board' | 'backlog'>(location.hash === '#backlog' ? 'backlog' : 'board')
   const [modalKey, setModalKey] = useState<string | null>(null)
@@ -43,6 +44,8 @@ export default function App() {
       .catch((e: Error) => setFatal(e.message))
     api<Person[]>('/people').then(setPeople).catch(() => {})
     api<Team[]>('/teams').then(setTeams).catch(() => {})
+    // "Me" is whichever person the server's YESOD_ME env var names (null if unset/unmatched).
+    api<{ me: Person | null }>('/meta').then((m) => setMe(m.me)).catch(() => {})
   }, [needLogin, version])
 
   useEffect(() => {
@@ -50,8 +53,6 @@ export default function App() {
     api<Sprint[]>(`/sprints?project_id=${projectId}`).then(setSprints).catch(() => {})
     api<Status[]>(`/statuses?project_id=${projectId}`).then(setStatuses).catch(() => {})
   }, [needLogin, projectId, version])
-
-  const me = people.find((p) => p.name === 'Saechan') ?? null
 
   if (needLogin) {
     return (
