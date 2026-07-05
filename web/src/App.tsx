@@ -69,7 +69,10 @@ export default function App() {
   return (
     <>
       <header className="topbar">
-        <span className="brand">Yesod</span>
+        <span className="brand" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <img src="/favicon.png" alt="Yesod" style={{ width: '20px', height: '20px', borderRadius: '4px' }} />
+          Yesod
+        </span>
         <select
           value={projectId ?? ''}
           onChange={(e) => {
@@ -197,7 +200,10 @@ function Login({ onDone }: { onDone: () => void }) {
             .catch((er: Error) => setErr(er.message))
         }}
       >
-        <h1>Yesod</h1>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginBottom: '20px' }}>
+          <img src="/favicon.png" alt="Yesod" style={{ width: '48px', height: '48px', borderRadius: '8px' }} />
+          <h1 style={{ margin: 0, fontSize: '32px' }}>Yesod</h1>
+        </div>
         <input
           type="password"
           placeholder="Password"
