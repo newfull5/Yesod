@@ -1,0 +1,10 @@
+services:
+  yesod:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      YESOD_DB: /data/yesod.db
+    volumes:
+      - ./data:/data
+    restart: unless-stopped

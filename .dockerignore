@@ -1,0 +1,9 @@
+.git
+.omc
+.DS_Store
+data
+web/node_modules
+web/dist
+mcp/node_modules
+yesod
+assets
