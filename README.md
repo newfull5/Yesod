@@ -1,4 +1,4 @@
-# Yesod (יסוד)
+# Yesod
 
 Ultra-light self-hosted issue tracker for a single user.
 
