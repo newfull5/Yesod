@@ -2,7 +2,17 @@ import { useCallback, useEffect, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { api, LINK_TYPES } from './api'
 import type { Card, Detail, Person, Sprint, Status, Team } from './api'
-import { Avatar, TypeIcon } from './ui'
+import {
+  Avatar,
+  IconCalendar,
+  IconClock,
+  IconParent,
+  IconPerson,
+  IconSprint,
+  IconStatus,
+  IconTeam,
+  TypeIcon,
+} from './ui'
 
 type Props = {
   issueKey: string
@@ -117,7 +127,7 @@ export default function IssueModal({
                 <Activity issue={issue} k={k} me={me} onChanged={() => void load()} />
               </div>
               <aside className="modal-side">
-                <Field label="Status">
+                <Field label="Status" icon={IconStatus}>
                   <select value={issue.status.id} onChange={(e) => patch({ status_id: Number(e.target.value) })}>
                     {statuses.map((s) => (
                       <option key={s.id} value={s.id}>
@@ -126,7 +136,7 @@ export default function IssueModal({
                     ))}
                   </select>
                 </Field>
-                <Field label="Assignee">
+                <Field label="Assignee" icon={IconPerson}>
                   <PersonSelect
                     people={people}
                     value={issue.assignee}
@@ -138,14 +148,14 @@ export default function IssueModal({
                     </button>
                   )}
                 </Field>
-                <Field label="Reporter">
+                <Field label="Reporter" icon={IconPerson}>
                   <PersonSelect
                     people={people}
                     value={issue.reporter}
                     onChange={(id) => patch({ reporter_id: id })}
                   />
                 </Field>
-                <Field label="Sprints">
+                <Field label="Sprints" icon={IconSprint}>
                   {sprints.length === 0 && <span className="muted">No sprints</span>}
                   {sprints.map((s) => (
                     <label key={s.id} className="check">
@@ -162,24 +172,24 @@ export default function IssueModal({
                     </label>
                   ))}
                 </Field>
-                <Field label="Parent">
+                <Field label="Parent" icon={IconParent}>
                   <ParentPicker issue={issue} projectId={projectId} onPick={(id) => patch({ parent_id: id })} />
                 </Field>
-                <Field label="Start date">
+                <Field label="Start date" icon={IconCalendar}>
                   <input
                     type="date"
                     value={issue.start_date ?? ''}
                     onChange={(e) => patch({ start_date: e.target.value || null })}
                   />
                 </Field>
-                <Field label="Due date">
+                <Field label="Due date" icon={IconCalendar}>
                   <input
                     type="date"
                     value={issue.due_date ?? ''}
                     onChange={(e) => patch({ due_date: e.target.value || null })}
                   />
                 </Field>
-                <Field label="Team">
+                <Field label="Team" icon={IconTeam}>
                   <select
                     value={issue.team?.id ?? ''}
                     onChange={(e) => patch({ team_id: e.target.value ? Number(e.target.value) : null })}
@@ -192,10 +202,10 @@ export default function IssueModal({
                     ))}
                   </select>
                 </Field>
-                <Field label="Created">
+                <Field label="Created" icon={IconClock}>
                   <span className="muted">{issue.created_at} UTC</span>
                 </Field>
-                <Field label="Updated">
+                <Field label="Updated" icon={IconClock}>
                   <span className="muted">{issue.updated_at} UTC</span>
                 </Field>
               </aside>
@@ -207,10 +217,21 @@ export default function IssueModal({
   )
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  icon: Icon,
+  children,
+}: {
+  label: string
+  icon?: React.ComponentType
+  children: React.ReactNode
+}) {
   return (
     <div className="field">
-      <div className="field-label">{label}</div>
+      <div className="field-label">
+        {Icon && <Icon />}
+        {label}
+      </div>
       <div className="field-value">{children}</div>
     </div>
   )

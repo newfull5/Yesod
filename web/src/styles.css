@@ -188,8 +188,8 @@ section {
 
 .board {
   display: flex;
-  gap: 12px;
-  padding: 16px;
+  gap: 16px;
+  padding: 20px max(16px, calc((100% - 1180px) / 2));
   overflow-x: auto;
   align-items: flex-start;
 }
@@ -197,8 +197,9 @@ section {
 .column {
   background: var(--panel);
   border-radius: 8px;
-  width: 290px;
-  flex: 0 0 auto;
+  flex: 1 1 300px;
+  min-width: 280px;
+  max-width: 380px;
   padding: 8px;
   display: flex;
   flex-direction: column;
@@ -234,6 +235,7 @@ section {
 .card {
   background: var(--card);
   border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
   border-radius: 6px;
   padding: 10px;
   cursor: grab;
@@ -241,6 +243,7 @@ section {
 
 .card:hover {
   border-color: var(--accent);
+  border-left-color: var(--accent);
 }
 
 .card.overlay {
@@ -558,11 +561,19 @@ section {
 }
 
 .field-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--muted);
   margin-bottom: 4px;
+}
+
+.field-icon {
+  flex: 0 0 auto;
+  opacity: 0.8;
 }
 
 .field-value {

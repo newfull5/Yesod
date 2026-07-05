@@ -1,21 +1,68 @@
 // Small shared presentational bits.
 
-const TYPE_STYLE: Record<string, { bg: string; glyph: string }> = {
-  story: { bg: '#36b37e', glyph: 'S' },
-  bug: { bg: '#e5493a', glyph: 'B' },
-  task: { bg: '#4bade8', glyph: 'T' },
-  epic: { bg: '#904ee2', glyph: 'E' },
+// Minimal hand-drawn glyphs (16x16, stroke=currentColor) — no icon library needed for four shapes.
+const TYPE_GLYPH: Record<string, React.ReactNode> = {
+  story: (
+    <path d="M3 12.5 8 5l5 7.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" />
+  ),
+  bug: (
+    <>
+      <circle cx="8" cy="9" r="4" fill="none" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M8 5V3M5.2 6.5 3.5 4.8M10.8 6.5l1.7-1.7M4 9H2M14 9h-2M5 12l-1.5 1.5M11 12l1.5 1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+    </>
+  ),
+  task: (
+    <path d="M4 8.5 6.8 11 12 4.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+  ),
+  epic: <path d="M9 2 3.5 9h3.8L6.5 14 12.5 6.5H8.7z" fill="currentColor" />,
+}
+
+export const TYPE_COLOR: Record<string, string> = {
+  story: '#36b37e',
+  bug: '#e5493a',
+  task: '#4bade8',
+  epic: '#904ee2',
+}
+
+export function typeColor(t: { icon: string } | null): string {
+  return (t && TYPE_COLOR[t.icon]) || '#64748b'
 }
 
 export function TypeIcon({ t }: { t: { name: string; icon: string } | null }) {
   if (!t) return null
-  const s = TYPE_STYLE[t.icon] ?? { bg: '#64748b', glyph: t.name[0]?.toUpperCase() ?? '?' }
+  const color = typeColor(t)
+  const glyph = TYPE_GLYPH[t.icon]
   return (
-    <span className="typeicon" title={t.name} style={{ background: s.bg }}>
-      {s.glyph}
+    <span className="typeicon" title={t.name} style={{ background: color }}>
+      {glyph ? (
+        <svg width="10" height="10" viewBox="0 0 16 16">
+          {glyph}
+        </svg>
+      ) : (
+        t.name[0]?.toUpperCase()
+      )}
     </span>
   )
 }
+
+// Field-label icons for the issue modal side panel — same hand-drawn style, 14x14.
+function fieldIcon(paths: React.ReactNode) {
+  return function Icon() {
+    return (
+      <svg className="field-icon" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+        {paths}
+      </svg>
+    )
+  }
+}
+
+export const IconStatus = fieldIcon(<path d="M3 8.5 6.5 12 13 4" />)
+export const IconPerson = fieldIcon(<><circle cx="8" cy="5.5" r="2.5" /><path d="M2.5 14c0-3 2.5-5 5.5-5s5.5 2 5.5 5" /></>)
+export const IconSprint = fieldIcon(<><rect x="2.5" y="2.5" width="11" height="11" rx="1.5" /><path d="M2.5 6.5h11M6 2.5v11" /></>)
+export const IconParent = fieldIcon(<path d="M4 13V6a2 2 0 0 1 2-2h6M8 8 12 4l0 8" />)
+export const IconCalendar = fieldIcon(<><rect x="2.5" y="3.5" width="11" height="10" rx="1.5" /><path d="M2.5 6.5h11M5.5 2v3M10.5 2v3" /></>)
+export const IconTeam = fieldIcon(<><circle cx="5.5" cy="6" r="2" /><circle cx="11" cy="7" r="1.6" /><path d="M2 13c0-2.2 1.6-3.5 3.5-3.5S9 10.8 9 13M9.3 9.8c1.6.1 2.7 1.2 2.7 3.2" /></>)
+export const IconClock = fieldIcon(<><circle cx="8" cy="8" r="5.5" /><path d="M8 5v3l2 1.5" /></>)
 
 export function Avatar({ p, size = 24 }: { p: { name: string; avatar_color?: string | null }; size?: number }) {
   const initials = p.name

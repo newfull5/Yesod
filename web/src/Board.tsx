@@ -14,7 +14,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { api } from './api'
 import type { Card, Column, Detail } from './api'
 import type { Filters } from './App'
-import { Avatar, DueBadge, TypeIcon } from './ui'
+import { Avatar, DueBadge, TypeIcon, typeColor } from './ui'
 
 type Props = {
   projectId: number
@@ -30,7 +30,6 @@ function findCol(cols: Column[], id: string): Column | undefined {
 
 export default function Board({ projectId, filters, version, onOpen }: Props) {
   const [columns, setColumns] = useState<Column[] | null>(null)
-  const [sprintKeys, setSprintKeys] = useState<Set<string> | null>(null)
   const [activeCard, setActiveCard] = useState<Card | null>(null)
   const [error, setError] = useState('')
   const snapshot = useRef<Column[] | null>(null)
@@ -39,7 +38,14 @@ export default function Board({ projectId, filters, version, onOpen }: Props) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
 
   const load = useCallback(
-    () => api<{ columns: Column[] }>(`/board?project_id=${projectId}`).then((b) => setColumns(b.columns)),
+    () =>
+      api<{ columns: Column[] }>(`/board?project_id=${projectId}`).then((b) => {
+        // A drag started after this fetch went out; applying a stale board
+        // now would clobber the in-progress optimistic drag state (see
+        // onDragOver/onDragEnd). Drop the result — the drag's own end/cancel
+        // handler already leaves columns consistent.
+        if (snapshot.current == null) setColumns(b.columns)
+      }),
     [projectId],
   )
 
@@ -47,27 +53,10 @@ export default function Board({ projectId, filters, version, onOpen }: Props) {
     load().catch((e: Error) => setError(e.message))
   }, [load, version])
 
-  // Sprint membership is not on the card shape; fetch matching keys once per filter change.
-  useEffect(() => {
-    if (filters.sprint == null) {
-      setSprintKeys(null)
-      return
-    }
-    let dead = false
-    api<Card[]>(`/issues?project_id=${projectId}&sprint=${filters.sprint}`)
-      .then((list) => {
-        if (!dead) setSprintKeys(new Set(list.map((i) => i.key)))
-      })
-      .catch(() => {})
-    return () => {
-      dead = true
-    }
-  }, [projectId, filters.sprint, version])
-
   const matches = (c: Card) =>
     (filters.assignee == null || c.assignee?.id === filters.assignee) &&
     (filters.type == null || c.type?.id === filters.type) &&
-    (sprintKeys == null || sprintKeys.has(c.key)) &&
+    (filters.sprint == null || c.sprint_ids.includes(filters.sprint)) &&
     (!filters.q || c.title.toLowerCase().includes(filters.q.toLowerCase()))
 
   function onDragStart(e: DragStartEvent) {
@@ -186,7 +175,7 @@ export default function Board({ projectId, filters, version, onOpen }: Props) {
         </div>
         <DragOverlay>
           {activeCard && (
-            <div className="card overlay">
+            <div className="card overlay" style={{ borderLeftColor: typeColor(activeCard.type) }}>
               <CardBody card={activeCard} />
             </div>
           )}
@@ -231,7 +220,12 @@ function SortableCard({ card, onOpen }: { card: Card; onOpen: (key: string) => v
     <div
       ref={setNodeRef}
       className="card"
-      style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 }}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.4 : 1,
+        borderLeftColor: typeColor(card.type),
+      }}
       {...attributes}
       {...listeners}
       onClick={() => onOpen(card.key)}
