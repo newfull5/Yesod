@@ -3,7 +3,7 @@
 Ultra-light self-hosted issue tracker for a single user.
 
 <p align="center">
-  <img src="assets/yesod_logo_512x512.png" alt="Yesod logo" width="160" />
+  <img src="assets/yesod_logo_512x512.png" alt="Yesod logo" width="320" />
 </p>
 
 **Yesod** ("foundation" in Hebrew) is a lightweight, self-hosted issue tracker for small personal workflows and resource-constrained home servers. It runs as a Go HTTP server with an embedded React Kanban UI, stores data in CGO-free SQLite, and includes a companion Model Context Protocol (MCP) server for AI-assisted issue management.
