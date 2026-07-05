@@ -3,7 +3,7 @@
 Ultra-light self-hosted issue tracker for a single user.
 
 <p align="center">
-  <img src="assets/yesod_logo_512x512.png" alt="Yesod logo" width="320" />
+  <img src="assets/yesod_logo_readme.png" alt="Yesod logo" width="320" />
 </p>
 
 AI coding makes it easy to produce work quickly, but it also makes task boundaries and history harder to keep clean. I wanted a small local ticket board that could stay open while I work with Claude Code: record context, turn new follow-ups into todos immediately, and keep lightweight history without pulling in a full project-management system.
