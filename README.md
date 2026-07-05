@@ -1,98 +1,145 @@
-# Yesod (יסود) — Ultra-light Self-hosted Issue Tracker
+# Yesod (יסוד)
+
+Ultra-light self-hosted issue tracker for a single user.
 
 <p align="center">
-  <img src="assets/yesod_banner.jpg" alt="Yesod Banner" width="600" style="border-radius: 8px;" />
+  <img src="assets/yesod_logo_512x512.png" alt="Yesod logo" width="160" />
 </p>
 
-**Yesod** ("Foundation" in Hebrew) is an ultra-lightweight, single-user Jira alternative designed to run on resource-constrained home servers (with less than 4GB RAM) with an idle memory footprint of **under 20MB** (Docker container stats: ~15.7MiB).
+**Yesod** ("foundation" in Hebrew) is a lightweight, self-hosted issue tracker for small personal workflows and resource-constrained home servers. It runs as a Go HTTP server with an embedded React Kanban UI, stores data in CGO-free SQLite, and includes a companion Model Context Protocol (MCP) server for AI-assisted issue management.
 
-It compiles into a single, dependency-free binary with a beautiful React-based Kanban board embedded using Go `embed.FS`, uses CGO-free SQLite for zero-config data storage, and provides a built-in Model Context Protocol (MCP) server so that you can interact with your task tracker directly via Claude Code.
+The project intentionally avoids team-management overhead such as notifications, complex workflow builders, and multi-user permission systems.
 
----
+## Features
 
-## Key Features
-
-1. **Drag-and-Drop Kanban Board** — Easily move issues across columns (Todo → In Progress → Done) using a smooth drag-and-drop interface driven by `@dnd-kit/core`.
-2. **Backlog View** — Prioritize issues and assign them to active or future sprints via drag-and-drop lists.
-3. **Rich Metadata Layout** — A two-column issue detail modal mirroring Jira (description, sub-tasks, linked tasks, assignees, reporters, sprints, start/due dates, teams, comments).
-4. **Claude Code / MCP Server** — Direct integration with AI assistants. List, fetch, create, comment on, and assign issues using natural language.
-5. **No Overhead (YAGNI)** — No notifications, complex workflow definitions, multi-user permissions, or heavy search index engines. Zero-setup single-user design.
-
----
+- **Kanban board**: Move issues across Todo, In Progress, and Done columns with drag-and-drop.
+- **Backlog view**: Prioritize issues and assign them to active or future sprints.
+- **Issue detail modal**: Track descriptions, subtasks, linked issues, assignees, reporters, sprints, dates, teams, and comments.
+- **Optional password gate**: Set `YESOD_PASSWORD` to require login for API and UI access.
+- **Companion MCP server**: List, fetch, create, update, assign, and comment on issues from MCP-capable assistants.
+- **Small deployment shape**: One Go server process, embedded frontend assets, and a local SQLite database.
 
 ## Project Structure
 
-```
+```text
 Yesod/
 ├── main.go              # Go HTTP server serving REST API and embedded UI
 ├── internal/
-│   ├── db/              # Database connection, schemas, and query helpers
+│   ├── db/              # Database connection, schema, and query helpers
 │   └── api/             # HTTP REST handlers
-├── web/                 # Vite + React + TypeScript + dnd-kit Frontend
-│   ├── public/          # Static assets (including Yesod brand logo)
-│   ├── src/             # App, Board, Backlog, and Detail components
-│   └── dist/            # Built assets embedded into Go binary
-├── mcp/                 # Node.js MCP server implementation
-├── Dockerfile           # Multi-stage build for scratch binary container
-└── docker-compose.yml   # Volume-mounted SQLite production compose spec
+├── web/                 # Vite + React + TypeScript frontend
+│   ├── public/          # Static web assets
+│   ├── src/             # App, board, backlog, and issue detail components
+│   └── dist/            # Built assets embedded into the Go binary
+├── mcp/                 # Node.js stdio MCP server
+├── assets/              # Project logo assets
+├── Dockerfile           # Multi-stage container build
+└── docker-compose.yml   # Local compose deployment
 ```
 
----
+## Requirements
 
-## Getting Started
+- Go 1.26+
+- Node.js 22+
+- npm
 
-### Prerequisites
-- [Go](https://go.dev/) 1.22+
-- [Node.js](https://nodejs.org/) v20+
+## Development
 
-### Development
+Install frontend dependencies first if this is a fresh checkout:
 
-Start the backend Go API server (listening on `:8080`) and Vite development server (listening on `:5173`, automatically proxying `/api` requests) concurrently:
+```bash
+cd web
+npm install
+cd ..
+```
+
+Start the Go API server on `:8080` and the Vite dev server on `:5173`:
 
 ```bash
 make dev
 ```
 
-Run test suites for the Go backend:
+Run the Go test suite:
 
 ```bash
 make test
 ```
 
-### Production Build & Run
+## Production Build
 
-Build the React frontend assets, embed them into Go, and build the static `./yesod` executable:
+Build the React frontend, embed it into the Go binary, and produce `./yesod`:
 
 ```bash
 make build
 ```
 
-Run the compiled server (defaults to port `:8080` and `./data/yesod.db` database path):
+Run the compiled server:
 
 ```bash
 YESOD_ADDR=:8080 YESOD_DB=./data/yesod.db ./yesod
 ```
 
-### Docker Deploy
+The app is available at `http://localhost:8080`.
 
-You can run Yesod instantly via Docker:
+## Docker
+
+Build and run with Docker Compose:
 
 ```bash
 docker compose up -d
 ```
-The application will be accessible at `http://localhost:8080`.
 
----
+The compose file mounts `./data` into the container so the SQLite database persists across restarts.
 
-## Claude Code (MCP) Integration
+To enable the optional password gate:
 
-To hook Yesod up with Claude Code:
+```bash
+YESOD_PASSWORD='change-me' docker compose up -d
+```
+
+## Configuration
+
+### Server
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `YESOD_ADDR` | `:8080` | HTTP listen address. |
+| `YESOD_DB` | `./data/yesod.db` | SQLite database path. |
+| `YESOD_PASSWORD` | unset | Enables password login when set. |
+
+### MCP
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `YESOD_URL` | `http://localhost:8080` | Base URL for the Yesod API. |
+| `YESOD_ME` | `Saechan` | Person name used by "assign to me" and default comments. |
+| `YESOD_PASSWORD` | unset | Password used by the MCP server when the Yesod instance requires login. |
+
+## MCP Integration
+
+Install MCP dependencies:
+
+```bash
+cd mcp
+npm install
+```
+
+Add the server to Claude Code:
 
 ```bash
 claude mcp add yesod -- node /absolute/path/to/Yesod/mcp/index.js
 ```
 
-### Environment Variables for MCP:
-- `YESOD_URL`: API URL of your Yesod instance (e.g., `http://localhost:8080`).
-- `YESOD_ME`: Your username (e.g., `Saechan`) to resolve "assign to me" actions.
-- `YESOD_PASSWORD`: (Optional) Password for instance access if authentication is configured.
+For a password-protected instance:
+
+```bash
+YESOD_URL=http://localhost:8080 YESOD_PASSWORD='change-me' claude mcp add yesod -- node /absolute/path/to/Yesod/mcp/index.js
+```
+
+## Citation
+
+If you reference this project, cite it using the metadata in [CITATION.cff](CITATION.cff).
+
+## License
+
+Yesod is licensed under the MIT License. See [LICENSE](LICENSE).

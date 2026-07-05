@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+message: "If you use Yesod, please cite it using this metadata."
+title: "Yesod"
+abstract: "Ultra-light self-hosted issue tracker for a single user, with an embedded React Kanban UI, SQLite storage, and a companion MCP server."
+type: software
+authors:
+  - name: "newfull5"
+repository-code: "https://github.com/newfull5/Yesod"
+url: "https://github.com/newfull5/Yesod"
+license: MIT
+date-released: "2026-07-05"
