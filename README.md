@@ -1,6 +1,8 @@
 # Yesod (יסود) — Ultra-light Self-hosted Issue Tracker
 
-![Yesod Cover](assets/Gemini_Generated_Image_fdbq0ofdbq0ofdbq.png)
+<p align="center">
+  <img src="assets/Gemini_Generated_Image_fdbq0ofdbq0ofdbq.png" alt="Yesod Cover" width="500" style="border-radius: 8px;" />
+</p>
 
 **Yesod** ("Foundation" in Hebrew) is an ultra-lightweight, single-user Jira alternative designed to run on resource-constrained home servers (with less than 4GB RAM) with an idle memory footprint of **under 20MB** (Docker container stats: ~15.7MiB).
 
