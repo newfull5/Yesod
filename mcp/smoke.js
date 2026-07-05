@@ -1,84 +1,57 @@
 #!/usr/bin/env node
 // Smoke test for the Yesod MCP server. Requires a running Yesod API.
 // Usage: YESOD_URL=http://localhost:8398 node smoke.js
-// Drives index.js over stdio with raw JSON-RPC (newline-delimited) and asserts
-// each tool produces sane output. Exits 0 on success, 1 on any failure.
-import { spawn } from 'node:child_process'
+// Drives index.js over stdio using the official MCP SDK client (spawn,
+// handshake, tools/list, tools/call). Exits 0 on success, 1 on any failure.
+import { Client } from '@modelcontextprotocol/sdk/client/index.js'
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import assert from 'node:assert'
 
-const child = spawn(process.execPath, [new URL('./index.js', import.meta.url).pathname], {
+const BASE = (process.env.YESOD_URL || 'http://localhost:8080').replace(/\/+$/, '')
+
+const transport = new StdioClientTransport({
+  command: process.execPath,
+  args: [new URL('./index.js', import.meta.url).pathname],
   env: process.env,
-  stdio: ['pipe', 'pipe', 'inherit'],
 })
+const client = new Client({ name: 'yesod-smoke', version: '0.0.0' })
 
-let buf = ''
-const pending = new Map()
-child.stdout.on('data', chunk => {
-  buf += chunk
-  let nl
-  while ((nl = buf.indexOf('\n')) >= 0) {
-    const line = buf.slice(0, nl).trim()
-    buf = buf.slice(nl + 1)
-    if (!line) continue
-    const msg = JSON.parse(line)
-    if (msg.id !== undefined && pending.has(msg.id)) {
-      const settle = pending.get(msg.id)
-      pending.delete(msg.id)
-      settle(msg)
-    }
-  }
-})
-
-let nextId = 1
-function rpc(method, params) {
-  const id = nextId++
-  child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n')
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      pending.delete(id)
-      reject(new Error(`timeout waiting for ${method}`))
-    }, 10000)
-    pending.set(id, msg => {
-      clearTimeout(timer)
-      msg.error ? reject(new Error(`${method}: ${JSON.stringify(msg.error)}`)) : resolve(msg.result)
-    })
-  })
-}
-const notify = (method, params) =>
-  child.stdin.write(JSON.stringify({ jsonrpc: '2.0', method, params }) + '\n')
 const call = async (name, args) => {
-  const res = await rpc('tools/call', { name, arguments: args })
+  const res = await client.callTool({ name, arguments: args })
   assert(!res.isError, `tool ${name} errored: ${res.content?.[0]?.text}`)
   return res.content[0].text
 }
 
 try {
-  const init = await rpc('initialize', {
-    protocolVersion: '2024-11-05',
-    capabilities: {},
-    clientInfo: { name: 'yesod-smoke', version: '0.0.0' },
+  // create_issue/list_issues need a real assignee; the seed no longer bakes
+  // one in (people start empty), so make one via the REST API directly.
+  const personRes = await fetch(`${BASE}/api/people`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ name: 'Smoke Tester' }),
   })
-  assert.equal(init.serverInfo.name, 'yesod', 'server name')
-  notify('notifications/initialized')
+  assert(personRes.ok, `create person failed: HTTP ${personRes.status}`)
 
-  const { tools } = await rpc('tools/list', {})
-  const names = tools.map(t => t.name).sort()
+  await client.connect(transport)
+
+  const { tools } = await client.listTools()
+  const names = tools.map((t) => t.name).sort()
   for (const want of ['add_comment', 'assign_to_me', 'create_issue', 'get_issue', 'list_issues', 'list_sprints', 'update_issue']) {
     assert(names.includes(want), `missing tool ${want}; got ${names}`)
   }
-  assert(tools.every(t => t.description.length > 20), 'every tool has a rich description')
+  assert(tools.every((t) => t.description.length > 20), 'every tool has a rich description')
 
   const created = await call('create_issue', {
     title: 'Smoke test issue',
     type: 'Bug',
-    assignee: 'Saechan',
+    assignee: 'Smoke Tester',
     due_date: '2026-07-31',
   })
   const key = created.match(/[A-Z]+-\d+/)?.[0]
   assert(key, `created output has an issue key: ${created}`)
-  assert(created.includes('(Bug)') && created.includes('@Saechan') && created.includes('due 2026-07-31'), `create output: ${created}`)
+  assert(created.includes('(Bug)') && created.includes('@Smoke Tester') && created.includes('due 2026-07-31'), `create output: ${created}`)
 
-  const listed = await call('list_issues', { assignee: 'Saechan', q: 'smoke test' })
+  const listed = await call('list_issues', { assignee: 'Smoke Tester', q: 'smoke test' })
   assert(listed.includes(key), `list_issues finds ${key}: ${listed}`)
 
   const updated = await call('update_issue', { key, status: 'In Progress' })
@@ -99,5 +72,5 @@ try {
   console.error('SMOKE FAILED:', err.message)
   process.exitCode = 1
 } finally {
-  child.kill()
+  await client.close()
 }

@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 // Yesod MCP server — stdio wrapper around the Yesod REST API (PLAN.md section 6).
 // Env: YESOD_URL (default http://localhost:8080), YESOD_PASSWORD (optional, logs in
-// automatically), YESOD_ME (person name used by assign_to_me, default "Saechan").
+// automatically), YESOD_ME (optional; person name used by assign_to_me / add_comment's
+// default author — no hardcoded default, matches the web UI's /api/meta).
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 
 const BASE = (process.env.YESOD_URL || 'http://localhost:8080').replace(/\/+$/, '')
 const PASSWORD = process.env.YESOD_PASSWORD || ''
-const ME = process.env.YESOD_ME || 'Saechan'
+const ME = process.env.YESOD_ME || ''
 
 // ---- HTTP -------------------------------------------------------------
 
@@ -227,24 +228,25 @@ server.registerTool('update_issue', {
 })
 
 server.registerTool('assign_to_me', {
-  description: `Assign an issue to me (the configured YESOD_ME person, currently "${ME}"). Shortcut for update_issue with my name as assignee.`,
+  description: `Assign an issue to me (the person named by the YESOD_ME env var${ME ? `, currently "${ME}"` : ' — not currently set'}). Shortcut for update_issue with my name as assignee.`,
   inputSchema: { key: keyParam },
 }, async ({ key }) => {
+  if (!ME) throw new Error('YESOD_ME is not set — configure it to use assign_to_me')
   const issue = await api('PATCH', `/issues/${encodeURIComponent(key.trim())}`, { assignee_id: await resolvePerson(ME) })
   return text(`Assigned ${card(issue)}`)
 })
 
 server.registerTool('add_comment', {
-  description: `Add a comment to an issue. Authored by the configured YESOD_ME person ("${ME}") when that person exists, otherwise anonymous; pass author to override.`,
+  description: `Add a comment to an issue. Authored by the person named by YESOD_ME${ME ? ` ("${ME}")` : ''} when that person exists, otherwise anonymous; pass author to override.`,
   inputSchema: {
     key: keyParam,
     body: z.string().min(1).describe('Comment text (required, non-empty).'),
-    author: z.string().optional().describe(`Author person NAME. Defaults to "${ME}" if that person exists; unknown default falls back to anonymous.`),
+    author: z.string().optional().describe('Author person NAME. Defaults to the YESOD_ME person if set and known; otherwise falls back to anonymous.'),
   },
 }, async ({ key, body, author }) => {
   const payload = { body }
   if (author !== undefined) payload.author_id = await resolvePerson(author)
-  else payload.author_id = await resolvePerson(ME).catch(() => undefined)
+  else if (ME) payload.author_id = await resolvePerson(ME).catch(() => undefined)
   if (payload.author_id === undefined) delete payload.author_id
   const c = await api('POST', `/issues/${encodeURIComponent(key.trim())}/comments`, payload)
   return text(`Comment added to ${key.trim()} by ${c.author ? c.author.name : 'anonymous'} at ${c.created_at}: ${c.body}`)
