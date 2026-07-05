@@ -1,5 +1,10 @@
 node_modules/
 .omc/
+.DS_Store
+**/.DS_Store
+Screen Shot*.png
+Screenshot*.png
+스크린샷*.png
 data/
 *.db*
 web/dist/*
