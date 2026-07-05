@@ -15,18 +15,6 @@ Yesod is for that use case. It is meant to be simple to run, light on resources,
 ## Run
 
 ```bash
-git clone https://github.com/newfull5/Yesod.git
-cd Yesod
-docker compose up -d
-```
-
-Open `http://localhost:8080`.
-
-Data is stored in `./data/yesod.db`.
-
-Or run the published image:
-
-```bash
 docker run -d \
   --name yesod \
   -p 8080:8080 \
@@ -34,12 +22,29 @@ docker run -d \
   ghcr.io/newfull5/yesod:v0.1.0
 ```
 
+Open `http://localhost:8080`.
+
+Data is stored in `./data/yesod.db`.
+
+Or run from source:
+
+```bash
+git clone https://github.com/newfull5/Yesod.git
+cd Yesod
+docker compose up -d
+```
+
 ## Settings
 
 Set a password:
 
 ```bash
-YESOD_PASSWORD='change-me' docker compose up -d
+docker run -d \
+  --name yesod \
+  -p 8080:8080 \
+  -v "$PWD/data:/data" \
+  -e YESOD_PASSWORD='change-me' \
+  ghcr.io/newfull5/yesod:v0.1.0
 ```
 
 ## License
