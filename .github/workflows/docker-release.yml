@@ -12,7 +12,7 @@ on:
         default: "latest"
 
 permissions:
-  contents: read
+  contents: write # create the GitHub Release
   packages: write
 
 jobs:
@@ -44,3 +44,9 @@ jobs:
           tags: |
             ghcr.io/newfull5/yesod:${{ inputs.image_tag || github.ref_name }}
             ghcr.io/newfull5/yesod:latest
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --generate-notes || echo "release already exists"
