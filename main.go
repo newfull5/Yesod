@@ -5,7 +5,6 @@ import (
 	"embed"
 	"io/fs"
 	"log"
-	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -41,34 +40,7 @@ func main() {
 	mux.Handle("/", spaHandler(dist))
 
 	log.Printf("yesod listening on %s (db: %s)", addr, dbPath)
-	log.Fatal(http.ListenAndServe(addr, hostCheck(mux, os.Getenv("YESOD_HOST"))))
-}
-
-// hostCheck rejects requests whose Host header is not a loopback/private
-// address or the YESOD_HOST allowlist entry. Mitigates DNS-rebinding attacks
-// against the default no-auth LAN mode, where any Host would otherwise be
-// answered (a malicious page could rebind attacker.com to 127.0.0.1/192.168.x.x
-// and issue same-origin requests against the full /api surface).
-func hostCheck(next http.Handler, allowHost string) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !hostAllowed(r.Host, allowHost) {
-			http.Error(w, "invalid host header", http.StatusForbidden)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
-}
-
-func hostAllowed(hostHeader, allowHost string) bool {
-	host := hostHeader
-	if h, _, err := net.SplitHostPort(hostHeader); err == nil {
-		host = h
-	}
-	if host == "localhost" || (allowHost != "" && host == allowHost) {
-		return true
-	}
-	ip := net.ParseIP(host)
-	return ip != nil && (ip.IsLoopback() || ip.IsPrivate())
+	log.Fatal(http.ListenAndServe(addr, mux))
 }
 
 func envOr(key, def string) string {
