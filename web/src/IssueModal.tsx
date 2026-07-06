@@ -74,7 +74,6 @@ export default function IssueModal({
   }
 
   async function remove() {
-    if (!confirm(`Delete ${k}? This cannot be undone.`)) return
     try {
       await api<void>(`/issues/${k}`, 'DELETE')
       onChanged()
@@ -111,9 +110,7 @@ export default function IssueModal({
                   Restore
                 </button>
               )}
-              <button className="btn danger-ghost" onClick={remove} title="Delete issue">
-                Delete
-              </button>
+              <DeleteButton issueKey={issue.key} onDelete={remove} />
               <button className="btn subtle" onClick={onClose} title="Close">
                 ✕
               </button>
@@ -592,5 +589,30 @@ function ParentPicker({
         </div>
       )}
     </div>
+  )
+}
+
+// Two-step confirm (same pattern as the board's Clear button): first click
+// arms the button, second click deletes; arming disarms on mouse-leave.
+function DeleteButton({ issueKey, onDelete }: { issueKey: string; onDelete: () => Promise<void> }) {
+  const [armed, setArmed] = useState(false)
+  const [busy, setBusy] = useState(false)
+  return (
+    <button
+      className={'btn danger-ghost' + (armed ? ' armed' : '')}
+      disabled={busy}
+      onMouseLeave={() => setArmed(false)}
+      onClick={() => {
+        if (!armed) return setArmed(true)
+        setBusy(true)
+        onDelete().finally(() => {
+          setBusy(false)
+          setArmed(false)
+        })
+      }}
+      title="Delete issue (cannot be undone)"
+    >
+      {armed ? `Delete ${issueKey}?` : 'Delete'}
+    </button>
   )
 }

@@ -23,7 +23,7 @@ export default function App() {
   const [filters, setFilters] = useState<Filters>(NO_FILTERS)
   const [view, setView] = useState<'board' | 'backlog'>(location.hash === '#backlog' ? 'backlog' : 'board')
   const [modalKey, setModalKey] = useState<string | null>(null)
-  const [creating, setCreating] = useState(false)
+  const [creating, setCreating] = useState<{ statusId?: number } | null>(null)
   const [version, setVersion] = useState(0)
   const bump = useCallback(() => setVersion((v) => v + 1), [])
 
@@ -114,7 +114,7 @@ export default function App() {
 
         <span className="spacer" />
 
-        <button className="btn primary" onClick={() => setCreating(true)} disabled={projectId == null}>
+        <button className="btn primary" onClick={() => setCreating({})} disabled={projectId == null}>
           <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round">
             <path d="M8 2v12M2 8h12" />
           </svg>
@@ -159,7 +159,13 @@ export default function App() {
 
       <main>
         {projectId != null && view === 'board' && (
-          <Board projectId={projectId} filters={filters} version={version} onOpen={setModalKey} />
+          <Board
+            projectId={projectId}
+            filters={filters}
+            version={version}
+            onOpen={setModalKey}
+            onCreate={(statusId) => setCreating({ statusId })}
+          />
         )}
         {projectId != null && view === 'backlog' && (
           <Backlog projectId={projectId} sprints={sprints} version={version} onOpen={setModalKey} />
@@ -171,9 +177,10 @@ export default function App() {
           projectId={projectId}
           statuses={statuses}
           people={people}
-          onClose={() => setCreating(false)}
+          initialStatusId={creating.statusId}
+          onClose={() => setCreating(null)}
           onCreated={(key) => {
-            setCreating(false)
+            setCreating(null)
             bump()
             setModalKey(key)
           }}
@@ -236,18 +243,20 @@ function CreateIssue({
   projectId,
   statuses,
   people,
+  initialStatusId,
   onClose,
   onCreated,
 }: {
   projectId: number
   statuses: Status[]
   people: Person[]
+  initialStatusId?: number
   onClose: () => void
   onCreated: (key: string) => void
 }) {
   const [title, setTitle] = useState('')
   const [typeId, setTypeId] = useState(3) // Task
-  const [statusId, setStatusId] = useState<number | ''>('')
+  const [statusId, setStatusId] = useState<number | ''>(initialStatusId ?? '')
   const [description, setDescription] = useState('')
   const [assigneeId, setAssigneeId] = useState<number | ''>('')
   const [err, setErr] = useState('')

@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -61,6 +62,13 @@ func spaHandler(dist fs.FS) http.Handler {
 		}
 		if p := strings.TrimPrefix(r.URL.Path, "/"); p != "" {
 			if _, err := fs.Stat(dist, p); err != nil {
+				// Missing assets must 404, not fall back to index.html —
+				// browsers heuristically cache the HTML response under the
+				// asset URL and keep showing a broken image after a rebuild.
+				if strings.Contains(path.Base(p), ".") {
+					http.NotFound(w, r)
+					return
+				}
 				r.URL.Path = "/" // SPA fallback
 			}
 		}

@@ -12,7 +12,7 @@ import type { DragEndEvent, DragOverEvent, DragStartEvent } from '@dnd-kit/core'
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { api } from './api'
-import type { Card, Column, Detail } from './api'
+import type { Card, Column } from './api'
 import type { Filters } from './App'
 import { Avatar, DueBadge, TypeIcon, typeColor } from './ui'
 
@@ -21,6 +21,7 @@ type Props = {
   filters: Filters
   version: number
   onOpen: (key: string) => void
+  onCreate: (statusId: number) => void
 }
 
 function findCol(cols: Column[], id: string): Column | undefined {
@@ -28,7 +29,7 @@ function findCol(cols: Column[], id: string): Column | undefined {
   return cols.find((c) => c.issues.some((i) => i.key === id))
 }
 
-export default function Board({ projectId, filters, version, onOpen }: Props) {
+export default function Board({ projectId, filters, version, onOpen, onCreate }: Props) {
   const [columns, setColumns] = useState<Column[] | null>(null)
   const [activeCard, setActiveCard] = useState<Card | null>(null)
   const [error, setError] = useState('')
@@ -140,11 +141,6 @@ export default function Board({ projectId, filters, version, onOpen }: Props) {
     onOpen(key)
   }
 
-  const quickAdd = (statusId: number) => async (title: string) => {
-    const d = await api<Detail>('/issues', 'POST', { project_id: projectId, title, status_id: statusId })
-    setColumns((cols) => (cols ? cols.map((c) => (c.id === statusId ? { ...c, issues: [...c.issues, d] } : c)) : cols))
-  }
-
   const clearColumn = (statusId: number) => async () => {
     try {
       await api(`/statuses/${statusId}/clear`, 'POST')
@@ -184,7 +180,7 @@ export default function Board({ projectId, filters, version, onOpen }: Props) {
               col={col}
               cards={col.issues.filter(matches)}
               onOpen={open}
-              onQuickAdd={quickAdd(col.id)}
+              onCreate={() => onCreate(col.id)}
               onClear={col.category === 'done' ? clearColumn(col.id) : undefined}
             />
           ))}
@@ -208,13 +204,13 @@ function BoardColumn({
   col,
   cards,
   onOpen,
-  onQuickAdd,
+  onCreate,
   onClear,
 }: {
   col: Column
   cards: Card[]
   onOpen: (key: string) => void
-  onQuickAdd: (title: string) => Promise<void>
+  onCreate: () => void
   onClear?: () => Promise<void>
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `col-${col.id}` })
@@ -233,7 +229,12 @@ function BoardColumn({
           ))}
         </div>
       </SortableContext>
-      <QuickAdd onAdd={onQuickAdd} />
+      <button className="quickadd-btn" onClick={onCreate}>
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <path d="M8 2v12M2 8h12" />
+        </svg>
+        Create
+      </button>
     </section>
   )
 }
@@ -388,71 +389,3 @@ function CardBody({ card }: { card: Card }) {
   )
 }
 
-function QuickAdd({ onAdd }: { onAdd: (title: string) => Promise<void> }) {
-  const [open, setOpen] = useState(false)
-  const [title, setTitle] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState('')
-  const wrapRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-    const onDocDown = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', onDocDown)
-    return () => document.removeEventListener('mousedown', onDocDown)
-  }, [open])
-
-  if (!open) {
-    return (
-      <button
-        className="quickadd-btn"
-        onClick={() => {
-          setOpen(true)
-          setTitle('')
-          setErr('')
-        }}
-      >
-        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-          <path d="M8 2v12M2 8h12" />
-        </svg>
-        Create
-      </button>
-    )
-  }
-  return (
-    <div className="quickadd" ref={wrapRef}>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          const t = title.trim()
-          if (!t || busy) return
-          setBusy(true)
-          onAdd(t)
-            .then(() => {
-              setTitle('')
-              setErr('')
-              inputRef.current?.focus()
-            })
-            .catch((er: Error) => setErr(er.message))
-            .finally(() => setBusy(false))
-        }}
-      >
-        <div className="quickadd-key">YS-</div>
-        <input
-          ref={inputRef}
-          className="quickadd-input"
-          placeholder="Issue title"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}
-          autoFocus
-        />
-        {err && <p className="error">{err}</p>}
-      </form>
-      <div className="quickadd-hint">Press Enter to add another issue</div>
-    </div>
-  )
-}
