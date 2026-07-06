@@ -4,6 +4,7 @@ import type { Detail, Person, Project, Sprint, Status, Team } from './api'
 import Board from './Board'
 import Backlog from './Backlog'
 import IssueModal from './IssueModal'
+import { Dropdown, TypeIcon } from './ui'
 
 export type Filters = { sprint: number | null; assignee: number | null; type: number | null; q: string }
 
@@ -67,27 +68,41 @@ export default function App() {
   if (fatal) return <div className="center-msg">Failed to load: {fatal}</div>
   if (projects === null) return <div className="center-msg">Loading…</div>
 
+  const project = projects.find((p) => p.id === projectId)
+
   return (
     <>
       <header className="topbar">
-        <span className="brand" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <img src="/favicon.png" alt="Yesod" style={{ width: '20px', height: '20px', borderRadius: '4px' }} />
+        <span className="brand">
+          <img src="/logo.png" alt="Yesod" className="brand-logo" />
           Yesod
         </span>
-        <select
-          value={projectId ?? ''}
-          onChange={(e) => {
-            setProjectId(Number(e.target.value))
-            setFilters(NO_FILTERS)
-          }}
-          title="Project"
-        >
-          {projects.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.key_prefix} — {p.name}
-            </option>
-          ))}
-        </select>
+
+        {projects.length > 1 ? (
+          <Dropdown
+            className="project-picker"
+            value={String(projectId ?? '')}
+            options={projects.map((p) => ({ value: String(p.id), label: `${p.key_prefix} — ${p.name}` }))}
+            onChange={(v) => {
+              setProjectId(Number(v))
+              setFilters(NO_FILTERS)
+            }}
+            renderValue={() => (
+              <>
+                <span className="project-dot" />
+                {project ? `${project.key_prefix} — ${project.name}` : 'Select project'}
+              </>
+            )}
+          />
+        ) : (
+          project && (
+            <span className="project-picker project-picker-static">
+              <span className="project-dot" />
+              {project.key_prefix} — {project.name}
+            </span>
+          )
+        )}
+
         <nav>
           <a href="#" className={view === 'board' ? 'active' : ''}>
             Board
@@ -96,44 +111,42 @@ export default function App() {
             Backlog
           </a>
         </nav>
-        {view === 'board' && (
-          <div className="filters">
-            <select
-              value={filters.sprint ?? ''}
-              onChange={(e) => setFilters({ ...filters, sprint: e.target.value ? Number(e.target.value) : null })}
-              title="Sprint"
-            >
-              <option value="">All sprints</option>
-              {sprints.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-            <select
-              value={filters.assignee ?? ''}
-              onChange={(e) => setFilters({ ...filters, assignee: e.target.value ? Number(e.target.value) : null })}
-              title="Assignee"
-            >
-              <option value="">All assignees</option>
-              {people.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-            <select
-              value={filters.type ?? ''}
-              onChange={(e) => setFilters({ ...filters, type: e.target.value ? Number(e.target.value) : null })}
-              title="Type"
-            >
-              <option value="">All types</option>
-              {ISSUE_TYPES.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
+
+        <span className="spacer" />
+
+        <button className="btn primary" onClick={() => setCreating(true)} disabled={projectId == null}>
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round">
+            <path d="M8 2v12M2 8h12" />
+          </svg>
+          Create issue
+        </button>
+      </header>
+
+      {view === 'board' && (
+        <div className="filter-row">
+          <Dropdown
+            value={filters.sprint != null ? String(filters.sprint) : ''}
+            placeholder="All sprints"
+            options={[{ value: '', label: 'All sprints' }, ...sprints.map((s) => ({ value: String(s.id), label: s.name }))]}
+            onChange={(v) => setFilters({ ...filters, sprint: v ? Number(v) : null })}
+          />
+          <Dropdown
+            value={filters.assignee != null ? String(filters.assignee) : ''}
+            placeholder="All assignees"
+            options={[{ value: '', label: 'All assignees' }, ...people.map((p) => ({ value: String(p.id), label: p.name }))]}
+            onChange={(v) => setFilters({ ...filters, assignee: v ? Number(v) : null })}
+          />
+          <Dropdown
+            value={filters.type != null ? String(filters.type) : ''}
+            placeholder="All types"
+            options={[{ value: '', label: 'All types' }, ...ISSUE_TYPES.map((t) => ({ value: String(t.id), label: t.name }))]}
+            onChange={(v) => setFilters({ ...filters, type: v ? Number(v) : null })}
+          />
+          <div className="search-box">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#9B95B3" strokeWidth="1.6">
+              <circle cx="7" cy="7" r="5" />
+              <path d="M11 11l3.5 3.5" />
+            </svg>
             <input
               type="search"
               placeholder="Search issues"
@@ -141,11 +154,8 @@ export default function App() {
               onChange={(e) => setFilters({ ...filters, q: e.target.value })}
             />
           </div>
-        )}
-        <button className="btn primary" onClick={() => setCreating(true)} disabled={projectId == null}>
-          + Create issue
-        </button>
-      </header>
+        </div>
+      )}
 
       <main>
         {projectId != null && view === 'board' && (
@@ -160,6 +170,7 @@ export default function App() {
         <CreateIssue
           projectId={projectId}
           statuses={statuses}
+          people={people}
           onClose={() => setCreating(false)}
           onCreated={(key) => {
             setCreating(false)
@@ -202,7 +213,7 @@ function Login({ onDone }: { onDone: () => void }) {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginBottom: '20px' }}>
-          <img src="/favicon.png" alt="Yesod" style={{ width: '48px', height: '48px', borderRadius: '8px' }} />
+          <img src="/logo.png" alt="Yesod" style={{ width: '48px', height: '48px', borderRadius: '8px' }} />
           <h1 style={{ margin: 0, fontSize: '32px' }}>Yesod</h1>
         </div>
         <input
@@ -224,19 +235,25 @@ function Login({ onDone }: { onDone: () => void }) {
 function CreateIssue({
   projectId,
   statuses,
+  people,
   onClose,
   onCreated,
 }: {
   projectId: number
   statuses: Status[]
+  people: Person[]
   onClose: () => void
   onCreated: (key: string) => void
 }) {
   const [title, setTitle] = useState('')
   const [typeId, setTypeId] = useState(3) // Task
   const [statusId, setStatusId] = useState<number | ''>('')
+  const [description, setDescription] = useState('')
+  const [assigneeId, setAssigneeId] = useState<number | ''>('')
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
+  const type = ISSUE_TYPES.find((t) => t.id === typeId)
+
   return (
     <div className="backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <form
@@ -250,6 +267,8 @@ function CreateIssue({
             title: title.trim(),
             type_id: typeId,
             ...(statusId !== '' ? { status_id: statusId } : {}),
+            ...(description.trim() ? { description: description.trim() } : {}),
+            ...(assigneeId !== '' ? { assignee_id: assigneeId } : {}),
           })
             .then((d) => onCreated(d.key))
             .catch((er: Error) => {
@@ -258,30 +277,68 @@ function CreateIssue({
             })
         }}
       >
-        <h2>Create issue</h2>
-        <input placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
-        <div className="dialog-row">
-          <select value={typeId} onChange={(e) => setTypeId(Number(e.target.value))} title="Type">
-            {ISSUE_TYPES.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-          <select
-            value={statusId}
-            onChange={(e) => setStatusId(e.target.value ? Number(e.target.value) : '')}
-            title="Status"
-          >
-            <option value="">Default status</option>
-            {statuses.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
+        <div className="dialog-head">
+          <h2>Create issue</h2>
         </div>
-        {err && <p className="error">{err}</p>}
+        <div className="dialog-body">
+          <div className="field">
+            <div className="field-label">Issue type</div>
+            <Dropdown
+              value={String(typeId)}
+              options={ISSUE_TYPES.map((t) => ({
+                value: String(t.id),
+                label: t.name,
+                render: (
+                  <>
+                    <TypeIcon t={t} />
+                    {t.name}
+                  </>
+                ),
+              }))}
+              onChange={(v) => setTypeId(Number(v))}
+              renderValue={() => (
+                <>
+                  {type && <TypeIcon t={type} />}
+                  {type?.name}
+                </>
+              )}
+            />
+          </div>
+          <div className="field">
+            <div className="field-label">Summary</div>
+            <input placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
+          </div>
+          <div className="dialog-row">
+            <div className="field">
+              <div className="field-label">Status</div>
+              <Dropdown
+                value={statusId === '' ? '' : String(statusId)}
+                placeholder="Default status"
+                options={[{ value: '', label: 'Default status' }, ...statuses.map((s) => ({ value: String(s.id), label: s.name }))]}
+                onChange={(v) => setStatusId(v ? Number(v) : '')}
+              />
+            </div>
+            <div className="field">
+              <div className="field-label">Assignee</div>
+              <Dropdown
+                value={assigneeId === '' ? '' : String(assigneeId)}
+                placeholder="Unassigned"
+                options={[{ value: '', label: 'Unassigned' }, ...people.map((p) => ({ value: String(p.id), label: p.name }))]}
+                onChange={(v) => setAssigneeId(v ? Number(v) : '')}
+              />
+            </div>
+          </div>
+          <div className="field">
+            <div className="field-label">Description</div>
+            <textarea
+              placeholder="Add a description…"
+              rows={3}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </div>
+        </div>
+        {err && <p className="error dialog-error">{err}</p>}
         <div className="dialog-actions">
           <button type="button" className="btn" onClick={onClose}>
             Cancel
