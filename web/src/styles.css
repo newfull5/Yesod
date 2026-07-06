@@ -166,6 +166,22 @@ section {
   color: #fff;
 }
 
+.btn.danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+
+.btn.danger:hover {
+  background: #c93b2d;
+  border-color: #c93b2d;
+}
+
+.btn.danger:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .linklike {
   background: none;
   border: none;
@@ -242,24 +258,20 @@ section {
   border-radius: 6px;
 }
 
-.project-picker {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--filter-bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 7px 12px;
-  font-size: 13px;
+/* Quiet by default — just the project name with a chevron; hover reveals
+   the clickable surface (the old double pill read as an oversized button). */
+.project-picker .dropdown-trigger {
+  background: none;
+  border-color: transparent;
+  font-size: 13.5px;
   font-weight: 600;
   color: var(--secondary);
-  cursor: pointer;
-  transition: background 0.12s ease, border-color 0.12s ease;
+  padding: 7px 10px;
 }
 
-.project-picker:hover {
+.project-picker .dropdown-trigger:hover {
   background: var(--hover-bg);
-  border-color: #d9cdee;
+  border-color: transparent;
 }
 
 .project-dot {
@@ -335,10 +347,66 @@ section {
 
 .board {
   display: flex;
-  gap: 18px;
+  gap: 0; /* spacing comes from the .col-gap insert zones between columns */
   padding: 24px max(24px, calc((100% - 1180px) / 2));
   overflow-x: auto;
   align-items: flex-start;
+}
+
+/* Insert zone between columns (and after the last one): a faint vertical
+   line that brightens on hover and reveals a + — click adds a column there. */
+.col-gap {
+  flex: 0 0 20px;
+  align-self: stretch;
+  min-height: 90px;
+  position: relative;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.col-gap::before {
+  content: '';
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  border-radius: 2px;
+  background: rgba(103, 65, 183, 0.06);
+  transition: background 0.12s ease;
+}
+
+.col-gap:hover::before,
+.col-gap:focus-visible::before {
+  background: rgba(103, 65, 183, 0.22);
+}
+
+.col-gap-plus {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  border: 1px solid var(--drag-over-border);
+  color: var(--accent);
+  font-size: 13px;
+  box-shadow: 0 1px 4px rgba(30, 20, 60, 0.12);
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.col-gap:hover .col-gap-plus,
+.col-gap:focus-visible .col-gap-plus {
+  opacity: 1;
 }
 
 .column {
@@ -544,59 +612,6 @@ section {
 
 /* ---- add column ---- */
 
-/* A ghost column slot: same width and top line as the real columns. */
-.add-column-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  flex: 0 0 280px;
-  align-self: flex-start;
-  background: none;
-  border: 1.5px dashed var(--border-2);
-  border-radius: 10px;
-  color: var(--faint);
-  padding: 12px 16px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: border-color 0.12s ease, color 0.12s ease, background 0.12s ease;
-}
-
-.add-column-btn:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: var(--hover-bg);
-}
-
-.add-column {
-  flex: 0 0 280px;
-  align-self: flex-start;
-  background: #fff;
-  border-radius: 10px;
-  box-shadow: 0 1px 2px rgba(30, 20, 60, 0.03), 0 4px 14px rgba(103, 65, 183, 0.1);
-}
-
-.add-column form {
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.add-column-input {
-  border: 1px solid var(--border-2);
-  border-radius: var(--radius);
-  padding: 7px 10px;
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.add-column-input:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-
 .add-column-cats {
   display: flex;
   gap: 6px;
@@ -626,12 +641,6 @@ section {
   border-color: var(--accent);
   background: var(--hover-bg);
   color: var(--accent);
-}
-
-.add-column-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
 }
 
 /* ---- dialogs / modal ---- */
@@ -720,6 +729,16 @@ section {
 .dialog-row {
   display: flex;
   gap: 10px;
+}
+
+.dialog-narrow {
+  width: 380px;
+}
+
+.dialog-text {
+  margin: 0;
+  color: var(--secondary);
+  line-height: 1.55;
 }
 
 .dialog-row .field {
@@ -1158,6 +1177,32 @@ section {
 
 .dropdown-option:hover {
   background: var(--hover-bg);
+}
+
+.dropdown-option:focus {
+  outline: none;
+}
+
+.dropdown-option:focus-visible {
+  background: var(--hover-bg);
+}
+
+.dropdown-trailing {
+  margin-left: auto;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  color: var(--faint);
+  opacity: 0;
+  transition: opacity 0.12s ease, color 0.12s ease;
+}
+
+.dropdown-option:hover .dropdown-trailing {
+  opacity: 1;
+}
+
+.dropdown-trailing:hover {
+  color: var(--danger);
 }
 
 .dropdown-check {

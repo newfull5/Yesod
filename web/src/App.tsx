@@ -25,6 +25,7 @@ export default function App() {
   const [modalKey, setModalKey] = useState<string | null>(null)
   const [creating, setCreating] = useState<{ statusId?: number } | null>(null)
   const [newProject, setNewProject] = useState(false)
+  const [deletingProject, setDeletingProject] = useState<Project | null>(null)
   const [version, setVersion] = useState(0)
   const bump = useCallback(() => setVersion((v) => v + 1), [])
 
@@ -83,7 +84,19 @@ export default function App() {
           className="project-picker"
           value={String(projectId ?? '')}
           options={[
-            ...projects.map((p) => ({ value: String(p.id), label: `${p.key_prefix} — ${p.name}` })),
+            ...projects.map((p) => ({
+              value: String(p.id),
+              label: `${p.key_prefix} — ${p.name}`,
+              trailing: {
+                title: `Delete ${p.name}`,
+                icon: (
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
+                    <path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5 5.3 14h5.4l.8-9.5M6.8 7v4.5M9.2 7v4.5" />
+                  </svg>
+                ),
+                onClick: () => setDeletingProject(p),
+              },
+            })),
             { value: 'new', label: '+ New project' },
           ]}
           onChange={(v) => {
@@ -167,6 +180,22 @@ export default function App() {
           <Backlog projectId={projectId} sprints={sprints} version={version} onOpen={setModalKey} />
         )}
       </main>
+
+      {deletingProject && (
+        <DeleteProject
+          project={deletingProject}
+          onClose={() => setDeletingProject(null)}
+          onDeleted={() => {
+            const remaining = projects.filter((p) => p.id !== deletingProject.id)
+            setDeletingProject(null)
+            setProjects(remaining)
+            if (projectId === deletingProject.id) {
+              setProjectId(remaining[0]?.id ?? null)
+              setFilters(NO_FILTERS)
+            }
+          }}
+        />
+      )}
 
       {newProject && (
         <NewProject
@@ -294,6 +323,56 @@ function NewProject({ onClose, onCreated }: { onClose: () => void; onCreated: (p
           </button>
           <button type="submit" className="btn primary" disabled={!name.trim() || !key.trim() || busy}>
             Create
+          </button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
+// Deleting a project wipes all of its issues, sprints and columns, so it
+// requires typing the project key — an armed button is not enough here.
+function DeleteProject({ project, onClose, onDeleted }: { project: Project; onClose: () => void; onDeleted: () => void }) {
+  const [typed, setTyped] = useState('')
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
+  const match = typed.trim().toUpperCase() === project.key_prefix
+  return (
+    <div className="backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <form
+        className="dialog dialog-narrow"
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (!match || busy) return
+          setBusy(true)
+          api<void>(`/projects/${project.id}`, 'DELETE')
+            .then(onDeleted)
+            .catch((er: Error) => {
+              setErr(er.message)
+              setBusy(false)
+            })
+        }}
+      >
+        <div className="dialog-head">
+          <h2>Delete project</h2>
+        </div>
+        <div className="dialog-body">
+          <p className="dialog-text">
+            This permanently deletes <strong>{project.name}</strong> — every issue, sprint and column in it. This
+            cannot be undone.
+          </p>
+          <div className="field">
+            <div className="field-label">Type {project.key_prefix} to confirm</div>
+            <input placeholder={project.key_prefix} value={typed} onChange={(e) => setTyped(e.target.value)} autoFocus />
+          </div>
+        </div>
+        {err && <p className="error dialog-error">{err}</p>}
+        <div className="dialog-actions">
+          <button type="button" className="btn" onClick={onClose}>
+            Cancel
+          </button>
+          <button type="submit" className="btn danger" disabled={!match || busy}>
+            Delete project
           </button>
         </div>
       </form>

@@ -36,6 +36,7 @@ func RegisterRoutes(mux *http.ServeMux, d *sql.DB) {
 	api.HandleFunc("GET /api/meta", s.meta)
 	api.HandleFunc("GET /api/projects", s.listProjects)
 	api.HandleFunc("POST /api/projects", s.createProject)
+	api.HandleFunc("DELETE /api/projects/{id}", s.deleteProject)
 	api.HandleFunc("GET /api/board", s.board)
 
 	api.HandleFunc("GET /api/issues", s.listIssues)

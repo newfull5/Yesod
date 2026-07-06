@@ -110,7 +110,14 @@ export function DueBadge({ due }: { due: string | null }) {
 
 // ---- Dropdown: single reusable popover replacing every native <select>. ----
 
-export type DropdownOption = { value: string; label: React.ReactNode; render?: React.ReactNode }
+export type DropdownOption = {
+  value: string
+  label: React.ReactNode
+  render?: React.ReactNode
+  // Optional hover-revealed action on the right edge of the option
+  // (e.g. a delete button) — clicking it does not select the option.
+  trailing?: { title: string; icon: React.ReactNode; onClick: () => void }
+}
 
 export function Dropdown({
   value,
@@ -168,6 +175,20 @@ export function Dropdown({
             >
               <span className="dropdown-check">{o.value === value ? '✓' : ''}</span>
               {o.render ?? o.label}
+              {o.trailing && (
+                <span
+                  role="button"
+                  className="dropdown-trailing"
+                  title={o.trailing.title}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setOpen(false)
+                    o.trailing!.onClick()
+                  }}
+                >
+                  {o.trailing.icon}
+                </span>
+              )}
             </button>
           ))}
         </div>

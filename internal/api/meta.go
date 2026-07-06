@@ -89,6 +89,47 @@ func (s *server) createProject(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, project{ID: id, KeyPrefix: req.KeyPrefix, Name: req.Name, NextIssueNum: 1})
 }
 
+// deleteProject permanently removes a project and everything in it.
+// Issue deletion cascades comments, links and sprint memberships (schema
+// ON DELETE CASCADE); parents are detached first because the self-FK doesn't.
+func (s *server) deleteProject(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "invalid project id")
+		return
+	}
+	if exists, err := s.exists("projects", id); err != nil {
+		dbErr(w, err)
+		return
+	} else if !exists {
+		writeErr(w, http.StatusNotFound, "project not found")
+		return
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		dbErr(w, err)
+		return
+	}
+	defer tx.Rollback()
+	for _, q := range []string{
+		`UPDATE issues SET parent_id = NULL WHERE project_id = ?`,
+		`DELETE FROM issues WHERE project_id = ?`,
+		`DELETE FROM sprints WHERE project_id = ?`,
+		`DELETE FROM statuses WHERE project_id = ?`,
+		`DELETE FROM projects WHERE id = ?`,
+	} {
+		if _, err := tx.Exec(q, id); err != nil {
+			dbErr(w, err)
+			return
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		dbErr(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // projectIDParam parses a required ?project_id= and verifies the project exists.
 func (s *server) projectIDParam(w http.ResponseWriter, r *http.Request) (int64, bool) {
 	raw := r.URL.Query().Get("project_id")
@@ -516,14 +557,27 @@ func (s *server) createStatus(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "unknown project_id")
 		return
 	}
-	order := int64(0)
-	if req.BoardOrder != nil {
-		order = *req.BoardOrder
-	} else if err := s.db.QueryRow(`SELECT COALESCE(MAX(board_order), 0) + 1 FROM statuses WHERE project_id = ?`, req.ProjectID).Scan(&order); err != nil {
+	tx, err := s.db.Begin()
+	if err != nil {
 		dbErr(w, err)
 		return
 	}
-	res, err := s.db.Exec(`INSERT INTO statuses (project_id, name, category, board_order) VALUES (?, ?, ?, ?)`,
+	defer tx.Rollback()
+	order := int64(0)
+	if req.BoardOrder != nil {
+		order = *req.BoardOrder
+		// Insert-between: shift later columns right so the new one lands
+		// exactly at the requested position.
+		if _, err := tx.Exec(`UPDATE statuses SET board_order = board_order + 1 WHERE project_id = ? AND board_order >= ?`,
+			req.ProjectID, order); err != nil {
+			dbErr(w, err)
+			return
+		}
+	} else if err := tx.QueryRow(`SELECT COALESCE(MAX(board_order), 0) + 1 FROM statuses WHERE project_id = ?`, req.ProjectID).Scan(&order); err != nil {
+		dbErr(w, err)
+		return
+	}
+	res, err := tx.Exec(`INSERT INTO statuses (project_id, name, category, board_order) VALUES (?, ?, ?, ?)`,
 		req.ProjectID, req.Name, req.Category, order)
 	if err != nil {
 		dbErr(w, err)
@@ -531,6 +585,10 @@ func (s *server) createStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	id, err := res.LastInsertId()
 	if err != nil {
+		dbErr(w, err)
+		return
+	}
+	if err := tx.Commit(); err != nil {
 		dbErr(w, err)
 		return
 	}

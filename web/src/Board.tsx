@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import {
   DndContext,
   DragOverlay,
@@ -32,6 +32,7 @@ function findCol(cols: Column[], id: string): Column | undefined {
 export default function Board({ projectId, filters, version, onOpen, onCreate }: Props) {
   const [columns, setColumns] = useState<Column[] | null>(null)
   const [activeCard, setActiveCard] = useState<Card | null>(null)
+  const [addAt, setAddAt] = useState<number | null>(null) // insert after this column index
   const [error, setError] = useState('')
   const snapshot = useRef<Column[] | null>(null)
   const justDragged = useRef(false)
@@ -151,8 +152,16 @@ export default function Board({ projectId, filters, version, onOpen, onCreate }:
     }
   }
 
-  const addColumn = async (name: string, category: string) => {
-    await api('/statuses', 'POST', { project_id: projectId, name, category })
+  // Insert after column index `at`: taking the next column's board_order
+  // makes the server shift later columns right; no next column = append.
+  const addColumn = (at: number) => async (name: string, category: string) => {
+    const next = columns?.[at + 1]
+    await api('/statuses', 'POST', {
+      project_id: projectId,
+      name,
+      category,
+      ...(next ? { board_order: next.board_order } : {}),
+    })
     await load()
   }
 
@@ -174,17 +183,20 @@ export default function Board({ projectId, filters, version, onOpen, onCreate }:
         onDragCancel={onDragCancel}
       >
         <div className="board">
-          {columns.map((col) => (
-            <BoardColumn
-              key={col.id}
-              col={col}
-              cards={col.issues.filter(matches)}
-              onOpen={open}
-              onCreate={() => onCreate(col.id)}
-              onClear={col.category === 'done' ? clearColumn(col.id) : undefined}
-            />
+          {columns.map((col, i) => (
+            <Fragment key={col.id}>
+              <BoardColumn
+                col={col}
+                cards={col.issues.filter(matches)}
+                onOpen={open}
+                onCreate={() => onCreate(col.id)}
+                onClear={col.category === 'done' ? clearColumn(col.id) : undefined}
+              />
+              <button className="col-gap" title="Add column here" onClick={() => setAddAt(i)}>
+                <span className="col-gap-plus">+</span>
+              </button>
+            </Fragment>
           ))}
-          <AddColumn onAdd={addColumn} />
         </div>
         <DragOverlay>
           {activeCard && (
@@ -194,6 +206,7 @@ export default function Board({ projectId, filters, version, onOpen, onCreate }:
           )}
         </DragOverlay>
       </DndContext>
+      {addAt != null && <AddColumnDialog onClose={() => setAddAt(null)} onAdd={addColumn(addAt)} />}
     </div>
   )
 }
@@ -270,78 +283,60 @@ const CATEGORIES = [
   { id: 'done', label: 'Done' },
 ] as const
 
-function AddColumn({ onAdd }: { onAdd: (name: string, category: string) => Promise<void> }) {
-  const [open, setOpen] = useState(false)
+function AddColumnDialog({ onClose, onAdd }: { onClose: () => void; onAdd: (name: string, category: string) => Promise<void> }) {
   const [name, setName] = useState('')
   const [category, setCategory] = useState<string>('in_progress')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
-  const wrapRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-    const onDocDown = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', onDocDown)
-    return () => document.removeEventListener('mousedown', onDocDown)
-  }, [open])
-
-  if (!open) {
-    return (
-      <button
-        className="add-column-btn"
-        onClick={() => {
-          setOpen(true)
-          setName('')
-          setErr('')
-        }}
-      >
-        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-          <path d="M8 2v12M2 8h12" />
-        </svg>
-        Add column
-      </button>
-    )
-  }
   return (
-    <div className="add-column" ref={wrapRef}>
+    <div className="backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <form
+        className="dialog dialog-narrow"
         onSubmit={(e) => {
           e.preventDefault()
           const n = name.trim()
           if (!n || busy) return
           setBusy(true)
           onAdd(n, category)
-            .then(() => setOpen(false))
+            .then(onClose)
             .catch((er: Error) => setErr(er.message))
             .finally(() => setBusy(false))
         }}
       >
-        <input
-          className="add-column-input"
-          placeholder="Column name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}
-          autoFocus
-        />
-        <div className="add-column-cats">
-          {CATEGORIES.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              className={'cat-pick' + (category === c.id ? ' active' : '')}
-              onClick={() => setCategory(c.id)}
-            >
-              <span className="col-dot" style={{ background: COL_DOT[c.id] }} />
-              {c.label}
-            </button>
-          ))}
+        <div className="dialog-head">
+          <h2>Add column</h2>
         </div>
-        {err && <p className="error">{err}</p>}
-        <div className="add-column-actions">
-          <button type="button" className="btn" onClick={() => setOpen(false)}>
+        <div className="dialog-body">
+          <div className="field">
+            <div className="field-label">Name</div>
+            <input
+              placeholder="Column name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Escape' && onClose()}
+              autoFocus
+            />
+          </div>
+          <div className="field">
+            <div className="field-label">Category</div>
+            <div className="add-column-cats">
+              {CATEGORIES.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  className={'cat-pick' + (category === c.id ? ' active' : '')}
+                  onClick={() => setCategory(c.id)}
+                >
+                  <span className="col-dot" style={{ background: COL_DOT[c.id] }} />
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+        {err && <p className="error dialog-error">{err}</p>}
+        <div className="dialog-actions">
+          <button type="button" className="btn" onClick={onClose}>
             Cancel
           </button>
           <button type="submit" className="btn primary" disabled={!name.trim() || busy}>
