@@ -356,7 +356,7 @@ section {
 /* Insert zone between columns (and after the last one): a faint vertical
    line that brightens on hover and reveals a + — click adds a column there. */
 .col-gap {
-  flex: 0 0 20px;
+  flex: 0 0 26px;
   align-self: stretch;
   min-height: 90px;
   position: relative;
@@ -492,6 +492,34 @@ section {
 .col-clear:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+.col-del {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  background: none;
+  border: none;
+  color: var(--faint);
+  padding: 2px 4px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+
+.col-clear + .col-del,
+.col-clear ~ .col-del {
+  margin-left: 2px;
+}
+
+.col-head:hover .col-del {
+  opacity: 1;
+}
+
+.col-del:hover {
+  background: var(--danger-bg);
+  color: var(--danger);
 }
 
 .col-cards {

@@ -37,7 +37,7 @@ try {
   const { tools } = await client.listTools()
   const names = tools.map((t) => t.name).sort()
   for (const want of ['add_comment', 'assign_to_me', 'create_issue', 'get_issue', 'list_issues', 'list_sprints', 'update_issue',
-    'list_projects', 'create_project', 'list_statuses', 'add_column', 'link_issues', 'unlink_issues',
+    'list_projects', 'create_project', 'list_statuses', 'add_column', 'delete_column', 'link_issues', 'unlink_issues',
     'list_people', 'create_person', 'list_teams', 'create_team', 'create_sprint', 'update_sprint']) {
     assert(names.includes(want), `missing tool ${want}; got ${names}`)
   }
@@ -80,6 +80,8 @@ try {
   assert(cols.includes('To Do (todo)') && cols.includes('Done (done)'), `default columns seeded: ${cols}`)
   const added = await call('add_column', { project_id: pid, name: 'In Review', category: 'in_progress' })
   assert(added.includes('In Review'), `add_column: ${added}`)
+  const delCol = await call('delete_column', { project_id: pid, name: 'In Review', move_to: 'To Do' })
+  assert(delCol.includes('Deleted column'), `delete_column: ${delCol}`)
 
   const other = await call('create_issue', { title: 'Smoke link target' })
   const otherKey = other.match(/[A-Z]+-\d+/)?.[0]

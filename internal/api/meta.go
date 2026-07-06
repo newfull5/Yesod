@@ -595,6 +595,89 @@ func (s *server) createStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, status{ID: id, ProjectID: req.ProjectID, Name: req.Name, Category: req.Category, BoardOrder: order})
 }
 
+// deleteStatus removes a board column. Policy: the last column of a project
+// cannot be deleted, and issues (archived ones included) are never lost —
+// a non-empty column requires ?move_to=<status id> in the same project, and
+// its issues are appended to the bottom of that column preserving order.
+func (s *server) deleteStatus(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "invalid status id")
+		return
+	}
+	var projectID int64
+	switch err := s.db.QueryRow(`SELECT project_id FROM statuses WHERE id = ?`, id).Scan(&projectID); {
+	case err == sql.ErrNoRows:
+		writeErr(w, http.StatusNotFound, "status not found")
+		return
+	case err != nil:
+		dbErr(w, err)
+		return
+	}
+	var siblings int64
+	if err := s.db.QueryRow(`SELECT COUNT(*) FROM statuses WHERE project_id = ?`, projectID).Scan(&siblings); err != nil {
+		dbErr(w, err)
+		return
+	}
+	if siblings <= 1 {
+		writeErr(w, http.StatusBadRequest, "cannot delete the last column of a project")
+		return
+	}
+	var issueCount int64
+	if err := s.db.QueryRow(`SELECT COUNT(*) FROM issues WHERE status_id = ?`, id).Scan(&issueCount); err != nil {
+		dbErr(w, err)
+		return
+	}
+	var moveTo int64
+	if raw := r.URL.Query().Get("move_to"); raw != "" {
+		moveTo, err = strconv.ParseInt(raw, 10, 64)
+		if err != nil || moveTo == id {
+			writeErr(w, http.StatusBadRequest, "invalid move_to")
+			return
+		}
+		var targetProject int64
+		switch err := s.db.QueryRow(`SELECT project_id FROM statuses WHERE id = ?`, moveTo).Scan(&targetProject); {
+		case err == sql.ErrNoRows:
+			writeErr(w, http.StatusBadRequest, "unknown move_to status")
+			return
+		case err != nil:
+			dbErr(w, err)
+			return
+		}
+		if targetProject != projectID {
+			writeErr(w, http.StatusBadRequest, "move_to must be a column of the same project")
+			return
+		}
+	} else if issueCount > 0 {
+		writeErr(w, http.StatusBadRequest, "column has issues — pass move_to=<status id> to relocate them")
+		return
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		dbErr(w, err)
+		return
+	}
+	defer tx.Rollback()
+	if issueCount > 0 {
+		if _, err := tx.Exec(`UPDATE issues SET status_id = ?,
+			board_order = COALESCE(board_order, 0) + (SELECT COALESCE(MAX(board_order), 0) + 1 FROM issues WHERE status_id = ?),
+			updated_at = datetime('now')
+			WHERE status_id = ?`, moveTo, moveTo, id); err != nil {
+			dbErr(w, err)
+			return
+		}
+	}
+	if _, err := tx.Exec(`DELETE FROM statuses WHERE id = ?`, id); err != nil {
+		dbErr(w, err)
+		return
+	}
+	if err := tx.Commit(); err != nil {
+		dbErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]int64{"moved": issueCount})
+}
+
 // clearStatus archives every issue in a done-category column: the cards leave
 // the board but stay in the database (visible in the backlog's Archive section).
 func (s *server) clearStatus(w http.ResponseWriter, r *http.Request) {

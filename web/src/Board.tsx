@@ -14,7 +14,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { api } from './api'
 import type { Card, Column } from './api'
 import type { Filters } from './App'
-import { Avatar, DueBadge, TypeIcon, typeColor } from './ui'
+import { Avatar, Dropdown, DueBadge, TypeIcon, typeColor } from './ui'
 
 type Props = {
   projectId: number
@@ -33,6 +33,7 @@ export default function Board({ projectId, filters, version, onOpen, onCreate }:
   const [columns, setColumns] = useState<Column[] | null>(null)
   const [activeCard, setActiveCard] = useState<Card | null>(null)
   const [addAt, setAddAt] = useState<number | null>(null) // insert after this column index
+  const [delCol, setDelCol] = useState<Column | null>(null)
   const [error, setError] = useState('')
   const snapshot = useRef<Column[] | null>(null)
   const justDragged = useRef(false)
@@ -191,6 +192,7 @@ export default function Board({ projectId, filters, version, onOpen, onCreate }:
                 onOpen={open}
                 onCreate={() => onCreate(col.id)}
                 onClear={col.category === 'done' ? clearColumn(col.id) : undefined}
+                onDelete={columns.length > 1 ? () => setDelCol(col) : undefined}
               />
               <button className="col-gap" title="Add column here" onClick={() => setAddAt(i)}>
                 <span className="col-gap-plus">+</span>
@@ -207,6 +209,18 @@ export default function Board({ projectId, filters, version, onOpen, onCreate }:
         </DragOverlay>
       </DndContext>
       {addAt != null && <AddColumnDialog onClose={() => setAddAt(null)} onAdd={addColumn(addAt)} />}
+      {delCol && (
+        <DeleteColumnDialog
+          col={delCol}
+          others={columns.filter((c) => c.id !== delCol.id)}
+          onClose={() => setDelCol(null)}
+          onDelete={async (moveTo) => {
+            await api(`/statuses/${delCol.id}?move_to=${moveTo}`, 'DELETE')
+            setDelCol(null)
+            await load()
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -219,12 +233,14 @@ function BoardColumn({
   onOpen,
   onCreate,
   onClear,
+  onDelete,
 }: {
   col: Column
   cards: Card[]
   onOpen: (key: string) => void
   onCreate: () => void
   onClear?: () => Promise<void>
+  onDelete?: () => void
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `col-${col.id}` })
   return (
@@ -234,6 +250,13 @@ function BoardColumn({
         {col.name}
         <span className="count">{cards.length}</span>
         {onClear && cards.length > 0 && <ClearButton count={cards.length} onClear={onClear} />}
+        {onDelete && (
+          <button className="col-del" title="Delete column" onClick={onDelete}>
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
+              <path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5 5.3 14h5.4l.8-9.5M6.8 7v4.5M9.2 7v4.5" />
+            </svg>
+          </button>
+        )}
       </div>
       <SortableContext items={cards.map((c) => c.key)} strategy={verticalListSortingStrategy}>
         <div ref={setNodeRef} className="col-cards">
@@ -282,6 +305,67 @@ const CATEGORIES = [
   { id: 'in_progress', label: 'In progress' },
   { id: 'done', label: 'Done' },
 ] as const
+
+// Column-delete policy: issues are never lost — everything in the column
+// (archived history included) moves to the chosen target column.
+function DeleteColumnDialog({
+  col,
+  others,
+  onClose,
+  onDelete,
+}: {
+  col: Column
+  others: Column[]
+  onClose: () => void
+  onDelete: (moveTo: number) => Promise<void>
+}) {
+  const [target, setTarget] = useState(others[0].id)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const n = col.issues.length
+  const targetCol = others.find((c) => c.id === target)
+  return (
+    <div className="backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <form
+        className="dialog dialog-narrow"
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (busy) return
+          setBusy(true)
+          onDelete(target).catch((er: Error) => {
+            setErr(er.message)
+            setBusy(false)
+          })
+        }}
+      >
+        <div className="dialog-head">
+          <h2>Delete column</h2>
+        </div>
+        <div className="dialog-body">
+          <p className="dialog-text">
+            Delete <strong>{col.name}</strong>?{' '}
+            {n > 0 ? `Its ${n} issue${n > 1 ? 's' : ''} (and any archived history) will move to:` : 'Any archived history in it will move to:'}
+          </p>
+          <Dropdown
+            value={String(target)}
+            options={others.map((c) => ({ value: String(c.id), label: c.name }))}
+            onChange={(v) => setTarget(Number(v))}
+            renderValue={() => targetCol?.name}
+          />
+        </div>
+        {err && <p className="error dialog-error">{err}</p>}
+        <div className="dialog-actions">
+          <button type="button" className="btn" onClick={onClose}>
+            Cancel
+          </button>
+          <button type="submit" className="btn danger" disabled={busy}>
+            Delete column
+          </button>
+        </div>
+      </form>
+    </div>
+  )
+}
 
 function AddColumnDialog({ onClose, onAdd }: { onClose: () => void; onAdd: (name: string, category: string) => Promise<void> }) {
   const [name, setName] = useState('')

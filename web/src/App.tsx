@@ -216,10 +216,9 @@ export default function App() {
           people={people}
           initialStatusId={creating.statusId}
           onClose={() => setCreating(null)}
-          onCreated={(key) => {
+          onCreated={() => {
             setCreating(null)
             bump()
-            setModalKey(key)
           }}
         />
       )}
@@ -455,8 +454,8 @@ function CreateIssue({
             />
           </div>
           <div className="field">
-            <div className="field-label">Summary</div>
-            <input placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
+            <div className="field-label">Title</div>
+            <input placeholder="What needs to be done?" value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
           </div>
           <div className="dialog-row">
             <div className="field">

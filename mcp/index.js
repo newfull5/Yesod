@@ -318,6 +318,21 @@ server.registerTool('add_column', {
   return text(`Added column "${s.name}" (${s.category}) to project ${project_id}`)
 })
 
+server.registerTool('delete_column', {
+  description: 'Delete a board column. The last column of a project cannot be deleted, and issues are never lost: everything in the column (archived history included) moves to the move_to column, which is required when the column is not empty.',
+  inputSchema: {
+    project_id: projectParam,
+    name: z.string().min(1).describe('Column NAME to delete, e.g. "In Review".'),
+    move_to: z.string().optional().describe('Column NAME to move the issues to. Required if the column has any issues.'),
+  },
+}, async ({ project_id = 1, name, move_to }) => {
+  const id = await resolveStatus(name, project_id)
+  const qs = move_to !== undefined ? `?move_to=${await resolveStatus(move_to, project_id)}` : ''
+  const res = await api('DELETE', `/statuses/${id}${qs}`)
+  const moved = res?.moved ?? 0
+  return text(`Deleted column "${name}"${moved ? ` — moved ${moved} issue(s) to ${move_to}` : ''}`)
+})
+
 server.registerTool('list_people', {
   description: 'List all people (usable as assignee/reporter/comment author names).',
   inputSchema: {},
