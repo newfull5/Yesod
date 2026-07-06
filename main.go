@@ -18,7 +18,7 @@ import (
 var webDist embed.FS
 
 func main() {
-	addr := envOr("YESOD_ADDR", ":8080")
+	addr := envOr("YESOD_ADDR", ":9999")
 	dbPath := envOr("YESOD_DB", "./data/yesod.db")
 
 	if err := os.MkdirAll(filepath.Dir(dbPath), 0o755); err != nil {

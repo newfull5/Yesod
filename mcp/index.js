@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 // Yesod MCP server — stdio wrapper around the Yesod REST API (PLAN.md section 6).
-// Env: YESOD_URL (default http://localhost:8080), YESOD_PASSWORD (optional, logs in
+// Env: YESOD_URL (default http://localhost:9999), YESOD_PASSWORD (optional, logs in
 // automatically), YESOD_ME (optional; person name used by assign_to_me / add_comment's
 // default author — no hardcoded default, matches the web UI's /api/meta).
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 
-const BASE = (process.env.YESOD_URL || 'http://localhost:8080').replace(/\/+$/, '')
+const BASE = (process.env.YESOD_URL || 'http://localhost:9999').replace(/\/+$/, '')
 const PASSWORD = process.env.YESOD_PASSWORD || ''
 const ME = process.env.YESOD_ME || ''
 

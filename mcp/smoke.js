@@ -7,7 +7,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import assert from 'node:assert'
 
-const BASE = (process.env.YESOD_URL || 'http://localhost:8080').replace(/\/+$/, '')
+const BASE = (process.env.YESOD_URL || 'http://localhost:9999').replace(/\/+$/, '')
 
 const transport = new StdioClientTransport({
   command: process.execPath,

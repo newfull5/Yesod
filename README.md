@@ -17,12 +17,12 @@ Yesod is for that use case. It is meant to be simple to run, light on resources,
 ```bash
 docker run -d \
   --name yesod \
-  -p 8080:8080 \
+  -p 9999:9999 \
   -v "$PWD/data:/data" \
-  ghcr.io/newfull5/yesod:v0.6.0
+  ghcr.io/newfull5/yesod:v0.7.0
 ```
 
-Open `http://localhost:8080`.
+Open `http://localhost:9999`.
 
 Data is stored in `./data/yesod.db`.
 
@@ -41,10 +41,10 @@ Set a password:
 ```bash
 docker run -d \
   --name yesod \
-  -p 8080:8080 \
+  -p 9999:9999 \
   -v "$PWD/data:/data" \
   -e YESOD_PASSWORD='change-me' \
-  ghcr.io/newfull5/yesod:v0.6.0
+  ghcr.io/newfull5/yesod:v0.7.0
 ```
 
 ## License

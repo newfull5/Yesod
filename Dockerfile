@@ -22,6 +22,6 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags=
 FROM scratch
 COPY --from=build /yesod /yesod
 ENV YESOD_DB=/data/yesod.db
-EXPOSE 8080
+EXPOSE 9999
 VOLUME /data
 ENTRYPOINT ["/yesod"]
