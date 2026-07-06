@@ -19,7 +19,7 @@ docker run -d \
   --name yesod \
   -p 8080:8080 \
   -v "$PWD/data:/data" \
-  ghcr.io/newfull5/yesod:v0.3.0
+  ghcr.io/newfull5/yesod:v0.4.0
 ```
 
 Open `http://localhost:8080`.
@@ -44,7 +44,7 @@ docker run -d \
   -p 8080:8080 \
   -v "$PWD/data:/data" \
   -e YESOD_PASSWORD='change-me' \
-  ghcr.io/newfull5/yesod:v0.3.0
+  ghcr.io/newfull5/yesod:v0.4.0
 ```
 
 ## License
