@@ -37,7 +37,7 @@ func migrate(d *sql.DB) error {
 	if err := d.QueryRow("PRAGMA user_version").Scan(&version); err != nil {
 		return err
 	}
-	if version >= 1 {
+	if version >= 2 {
 		return nil
 	}
 	tx, err := d.Begin()
@@ -45,13 +45,21 @@ func migrate(d *sql.DB) error {
 		return err
 	}
 	defer tx.Rollback()
-	if _, err := tx.Exec(schema); err != nil {
-		return err
+	if version < 1 {
+		// Fresh database: schema.sql is already at the latest version.
+		if _, err := tx.Exec(schema); err != nil {
+			return err
+		}
+		if err := seed(tx); err != nil {
+			return err
+		}
+	} else {
+		// v1 -> v2: issues.archived_at ("clear done" keeps history off the board).
+		if _, err := tx.Exec(`ALTER TABLE issues ADD COLUMN archived_at TEXT`); err != nil {
+			return err
+		}
 	}
-	if err := seed(tx); err != nil {
-		return err
-	}
-	if _, err := tx.Exec("PRAGMA user_version = 1"); err != nil {
+	if _, err := tx.Exec("PRAGMA user_version = 2"); err != nil {
 		return err
 	}
 	return tx.Commit()

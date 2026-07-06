@@ -1,6 +1,7 @@
 package db
 
 import (
+	"database/sql"
 	"path/filepath"
 	"testing"
 )
@@ -29,5 +30,32 @@ func TestOpenAppliesSchemaAndSeedsOnce(t *testing.T) {
 			t.Errorf("project key_prefix = %q, err %v, want YS", prefix, err)
 		}
 		d.Close()
+	}
+}
+
+func TestMigrateV1AddsArchivedAt(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "yesod.db")
+
+	// Fake a v1 database: issues table without archived_at, user_version = 1.
+	raw, err := sql.Open("sqlite", "file:"+path)
+	if err != nil {
+		t.Fatalf("open raw: %v", err)
+	}
+	if _, err := raw.Exec(`CREATE TABLE issues (id INTEGER PRIMARY KEY, title TEXT); PRAGMA user_version = 1`); err != nil {
+		t.Fatalf("create v1 db: %v", err)
+	}
+	raw.Close()
+
+	d, err := Open(path)
+	if err != nil {
+		t.Fatalf("open (migrate v1->v2): %v", err)
+	}
+	defer d.Close()
+	var version int
+	if err := d.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 2 {
+		t.Errorf("user_version = %d, err %v, want 2", version, err)
+	}
+	if _, err := d.Exec(`UPDATE issues SET archived_at = datetime('now')`); err != nil {
+		t.Errorf("archived_at column missing after migration: %v", err)
 	}
 }

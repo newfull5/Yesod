@@ -512,3 +512,53 @@ func TestAuthEnabled(t *testing.T) {
 	h.ServeHTTP(forged, req)
 	wantStatus(t, forged, http.StatusUnauthorized)
 }
+
+func TestClearDoneColumn(t *testing.T) {
+	h := setup(t)
+
+	done := createIssue(t, h, map[string]any{"title": "shipped", "status_id": 3})
+	kept := createIssue(t, h, map[string]any{"title": "still todo", "status_id": 1})
+
+	// Only done-category columns can be cleared.
+	wantStatus(t, do(t, h, "POST", "/api/statuses/1/clear", nil), http.StatusBadRequest)
+	wantStatus(t, do(t, h, "POST", "/api/statuses/999/clear", nil), http.StatusNotFound)
+
+	rec := do(t, h, "POST", "/api/statuses/3/clear", nil)
+	wantStatus(t, rec, http.StatusOK)
+	if n := parse[map[string]int64](t, rec)["archived"]; n != 1 {
+		t.Fatalf("archived = %d, want 1", n)
+	}
+
+	// Board no longer shows the archived issue; the todo one is untouched.
+	board := parse[struct {
+		Columns []struct {
+			ID     int64 `json:"id"`
+			Issues []struct {
+				Key string `json:"key"`
+			} `json:"issues"`
+		} `json:"columns"`
+	}](t, do(t, h, "GET", "/api/board?project_id=1", nil))
+	for _, col := range board.Columns {
+		for _, is := range col.Issues {
+			if is.Key == done.Key {
+				t.Errorf("archived issue %s still on board", done.Key)
+			}
+		}
+	}
+
+	// The issue itself survives with its history, flagged archived.
+	detail := parse[map[string]any](t, do(t, h, "GET", "/api/issues/"+done.Key, nil))
+	if detail["archived_at"] == nil {
+		t.Errorf("archived_at not set on %s", done.Key)
+	}
+	if kd := parse[map[string]any](t, do(t, h, "GET", "/api/issues/"+kept.Key, nil)); kd["archived_at"] != nil {
+		t.Errorf("todo issue %s unexpectedly archived", kept.Key)
+	}
+
+	// Restore via PATCH archived:false puts it back on the board.
+	wantStatus(t, do(t, h, "PATCH", "/api/issues/"+done.Key, map[string]any{"archived": false}), http.StatusOK)
+	detail = parse[map[string]any](t, do(t, h, "GET", "/api/issues/"+done.Key, nil))
+	if detail["archived_at"] != nil {
+		t.Errorf("archived_at still set after restore")
+	}
+}

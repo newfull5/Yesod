@@ -103,8 +103,14 @@ export default function IssueModal({
                 )}
                 <TypeIcon t={issue.type} />
                 <span className="modal-key">{issue.key}</span>
+                {issue.archived_at && <span className="archived-chip">Archived</span>}
               </span>
               <span className="spacer" />
+              {issue.archived_at && (
+                <button className="btn subtle" onClick={() => patch({ archived: false })} title="Put back on the board">
+                  Restore
+                </button>
+              )}
               <button className="btn danger-ghost" onClick={remove} title="Delete issue">
                 Delete
               </button>

@@ -67,8 +67,10 @@ export default function Backlog({ projectId, sprints, version, onOpen }: Props) 
 
   if (!issues) return <div className="center-msg">{error || 'Loading backlog…'}</div>
 
-  const inSprint = (sprintId: number) => issues.filter((i) => i.sprint_ids.includes(sprintId))
-  const unassigned = issues.filter((i) => i.sprint_ids.length === 0)
+  const active = issues.filter((i) => !i.archived_at)
+  const archived = issues.filter((i) => i.archived_at)
+  const inSprint = (sprintId: number) => active.filter((i) => i.sprint_ids.includes(sprintId))
+  const unassigned = active.filter((i) => i.sprint_ids.length === 0)
 
   return (
     <div className="backlog">
@@ -93,7 +95,46 @@ export default function Backlog({ projectId, sprints, version, onOpen }: Props) 
         ))}
         <Section droppableId="backlog" title="Backlog" subtitle="" rows={unassigned} from={null} onOpen={open} />
       </DndContext>
+      {archived.length > 0 && <ArchiveSection rows={archived} onOpen={open} />}
     </div>
+  )
+}
+
+// Work history: issues archived via the board's "Clear" button. Read-only
+// list (no drag) — open an issue and Restore to bring it back.
+function ArchiveSection({ rows, onOpen }: { rows: Card[]; onOpen: (key: string) => void }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <section className="backlog-section archive">
+      <button className="section-head archive-toggle" onClick={() => setOpen(!open)}>
+        <svg
+          className={'chevron' + (open ? ' open' : '')}
+          width="12"
+          height="12"
+          viewBox="0 0 16 16"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M6 3l5 5-5 5" />
+        </svg>
+        <strong>Archive</strong>
+        <span className="muted">cleared from the board</span>
+        <span className="count">{rows.length}</span>
+      </button>
+      {open &&
+        rows.map((c) => (
+          <div key={c.key} className="backlog-row archived" onClick={() => onOpen(c.key)}>
+            <TypeIcon t={c.type} />
+            <span className="key">{c.key}</span>
+            <span className="row-title">{c.title}</span>
+            <span className="muted archived-date">archived {c.archived_at?.slice(0, 10)}</span>
+            {c.assignee && <Avatar p={c.assignee} size={20} />}
+          </div>
+        ))}
+    </section>
   )
 }
 

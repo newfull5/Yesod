@@ -129,7 +129,7 @@ func (s *server) board(w http.ResponseWriter, r *http.Request) {
 		dbErr(w, err)
 		return
 	}
-	cards, err := s.queryCards("WHERE i.project_id = ?", "ORDER BY i.board_order, i.id", projectID)
+	cards, err := s.queryCards("WHERE i.project_id = ? AND i.archived_at IS NULL", "ORDER BY i.board_order, i.id", projectID)
 	if err != nil {
 		dbErr(w, err)
 		return
@@ -516,4 +516,35 @@ func (s *server) createStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, status{ID: id, ProjectID: req.ProjectID, Name: req.Name, Category: req.Category, BoardOrder: order})
+}
+
+// clearStatus archives every issue in a done-category column: the cards leave
+// the board but stay in the database (visible in the backlog's Archive section).
+func (s *server) clearStatus(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "invalid status id")
+		return
+	}
+	var category string
+	switch err := s.db.QueryRow(`SELECT category FROM statuses WHERE id = ?`, id).Scan(&category); {
+	case err == sql.ErrNoRows:
+		writeErr(w, http.StatusNotFound, "unknown status id")
+		return
+	case err != nil:
+		dbErr(w, err)
+		return
+	}
+	if category != "done" {
+		writeErr(w, http.StatusBadRequest, "only done columns can be cleared")
+		return
+	}
+	res, err := s.db.Exec(`UPDATE issues SET archived_at = datetime('now'), updated_at = datetime('now')
+		WHERE status_id = ? AND archived_at IS NULL`, id)
+	if err != nil {
+		dbErr(w, err)
+		return
+	}
+	n, _ := res.RowsAffected()
+	writeJSON(w, http.StatusOK, map[string]int64{"archived": n})
 }

@@ -145,6 +145,21 @@ export default function Board({ projectId, filters, version, onOpen }: Props) {
     setColumns((cols) => (cols ? cols.map((c) => (c.id === statusId ? { ...c, issues: [...c.issues, d] } : c)) : cols))
   }
 
+  const clearColumn = (statusId: number) => async () => {
+    try {
+      await api(`/statuses/${statusId}/clear`, 'POST')
+      setError('')
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Clear failed')
+    }
+  }
+
+  const addColumn = async (name: string, category: string) => {
+    await api('/statuses', 'POST', { project_id: projectId, name, category })
+    await load()
+  }
+
   if (!columns) return <div className="center-msg">{error || 'Loading board…'}</div>
 
   return (
@@ -170,8 +185,10 @@ export default function Board({ projectId, filters, version, onOpen }: Props) {
               cards={col.issues.filter(matches)}
               onOpen={open}
               onQuickAdd={quickAdd(col.id)}
+              onClear={col.category === 'done' ? clearColumn(col.id) : undefined}
             />
           ))}
+          <AddColumn onAdd={addColumn} />
         </div>
         <DragOverlay>
           {activeCard && (
@@ -192,11 +209,13 @@ function BoardColumn({
   cards,
   onOpen,
   onQuickAdd,
+  onClear,
 }: {
   col: Column
   cards: Card[]
   onOpen: (key: string) => void
   onQuickAdd: (title: string) => Promise<void>
+  onClear?: () => Promise<void>
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `col-${col.id}` })
   return (
@@ -205,6 +224,7 @@ function BoardColumn({
         <span className="col-dot" style={{ background: COL_DOT[col.category] || '#B0AAC7' }} />
         {col.name}
         <span className="count">{cards.length}</span>
+        {onClear && cards.length > 0 && <ClearButton count={cards.length} onClear={onClear} />}
       </div>
       <SortableContext items={cards.map((c) => c.key)} strategy={verticalListSortingStrategy}>
         <div ref={setNodeRef} className="col-cards">
@@ -215,6 +235,120 @@ function BoardColumn({
       </SortableContext>
       <QuickAdd onAdd={onQuickAdd} />
     </section>
+  )
+}
+
+// Two-step confirm: first click arms the button, second click archives.
+// Arming disarms on mouse-leave so a stray click can't clear the column.
+function ClearButton({ count, onClear }: { count: number; onClear: () => Promise<void> }) {
+  const [armed, setArmed] = useState(false)
+  const [busy, setBusy] = useState(false)
+  return (
+    <button
+      className={'col-clear' + (armed ? ' armed' : '')}
+      disabled={busy}
+      onMouseLeave={() => setArmed(false)}
+      onClick={() => {
+        if (!armed) return setArmed(true)
+        setBusy(true)
+        onClear().finally(() => {
+          setBusy(false)
+          setArmed(false)
+        })
+      }}
+      title="Archive all issues in this column (kept in Backlog → Archive)"
+    >
+      {armed ? `Archive ${count}?` : 'Clear'}
+    </button>
+  )
+}
+
+const CATEGORIES = [
+  { id: 'todo', label: 'To do' },
+  { id: 'in_progress', label: 'In progress' },
+  { id: 'done', label: 'Done' },
+] as const
+
+function AddColumn({ onAdd }: { onAdd: (name: string, category: string) => Promise<void> }) {
+  const [open, setOpen] = useState(false)
+  const [name, setName] = useState('')
+  const [category, setCategory] = useState<string>('in_progress')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const wrapRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onDocDown = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onDocDown)
+    return () => document.removeEventListener('mousedown', onDocDown)
+  }, [open])
+
+  if (!open) {
+    return (
+      <button
+        className="add-column-btn"
+        onClick={() => {
+          setOpen(true)
+          setName('')
+          setErr('')
+        }}
+      >
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <path d="M8 2v12M2 8h12" />
+        </svg>
+        Add column
+      </button>
+    )
+  }
+  return (
+    <div className="add-column" ref={wrapRef}>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          const n = name.trim()
+          if (!n || busy) return
+          setBusy(true)
+          onAdd(n, category)
+            .then(() => setOpen(false))
+            .catch((er: Error) => setErr(er.message))
+            .finally(() => setBusy(false))
+        }}
+      >
+        <input
+          className="add-column-input"
+          placeholder="Column name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}
+          autoFocus
+        />
+        <div className="add-column-cats">
+          {CATEGORIES.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              className={'cat-pick' + (category === c.id ? ' active' : '')}
+              onClick={() => setCategory(c.id)}
+            >
+              <span className="col-dot" style={{ background: COL_DOT[c.id] }} />
+              {c.label}
+            </button>
+          ))}
+        </div>
+        {err && <p className="error">{err}</p>}
+        <div className="add-column-actions">
+          <button type="button" className="btn" onClick={() => setOpen(false)}>
+            Cancel
+          </button>
+          <button type="submit" className="btn primary" disabled={!name.trim() || busy}>
+            Add
+          </button>
+        </div>
+      </form>
+    </div>
   )
 }
 

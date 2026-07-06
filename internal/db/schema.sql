@@ -56,6 +56,7 @@ CREATE TABLE issues (
     start_date  TEXT,
     due_date    TEXT,
     board_order REAL,                             -- card order within a column (midpoint insert)
+    archived_at TEXT,                             -- set by "clear done"; hidden from board, kept as history
     created_at  TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );

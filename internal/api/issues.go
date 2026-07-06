@@ -48,6 +48,7 @@ type issueCard struct {
 	DueDate    *string    `json:"due_date"`
 	BoardOrder float64    `json:"board_order"`
 	SprintIDs  []int64    `json:"sprint_ids"`
+	ArchivedAt *string    `json:"archived_at"`
 	CreatedAt  string     `json:"created_at"`
 	UpdatedAt  string     `json:"updated_at"`
 }
@@ -103,7 +104,7 @@ const cardSelect = `SELECT i.id, i.key, i.project_id, i.title,
 	i.assignee_id, a.name, a.avatar_color,
 	i.parent_id, i.start_date, i.due_date, i.board_order,
 	(SELECT group_concat(sprint_id) FROM issue_sprints WHERE issue_id = i.id) AS sprint_ids,
-	i.created_at, i.updated_at
+	i.archived_at, i.created_at, i.updated_at
 	FROM issues i
 	JOIN statuses st ON st.id = i.status_id
 	LEFT JOIN issue_types t ON t.id = i.type_id
@@ -133,13 +134,13 @@ func (s *server) queryCards(where, order string, args ...any) ([]issueCard, erro
 	for rows.Next() {
 		var c issueCard
 		var typeID, assigneeID, parentID sql.NullInt64
-		var typeName, typeIcon, aName, aColor, startDate, dueDate, sprintIDs sql.NullString
+		var typeName, typeIcon, aName, aColor, startDate, dueDate, sprintIDs, archivedAt sql.NullString
 		var bo sql.NullFloat64
 		if err := rows.Scan(&c.ID, &c.Key, &c.ProjectID, &c.Title,
 			&typeID, &typeName, &typeIcon,
 			&c.Status.ID, &c.Status.Name, &c.Status.Category,
 			&assigneeID, &aName, &aColor,
-			&parentID, &startDate, &dueDate, &bo, &sprintIDs, &c.CreatedAt, &c.UpdatedAt); err != nil {
+			&parentID, &startDate, &dueDate, &bo, &sprintIDs, &archivedAt, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, err
 		}
 		if typeID.Valid {
@@ -153,6 +154,7 @@ func (s *server) queryCards(where, order string, args ...any) ([]issueCard, erro
 		c.DueDate = nullStr(dueDate)
 		c.BoardOrder = bo.Float64
 		c.SprintIDs = parseIDList(sprintIDs)
+		c.ArchivedAt = nullStr(archivedAt)
 		cards = append(cards, c)
 	}
 	return cards, rows.Err()
@@ -162,7 +164,7 @@ func (s *server) getIssueDetail(key string) (*issueDetail, error) {
 	var d issueDetail
 	var typeID, assigneeID, reporterID, teamID, parentID sql.NullInt64
 	var typeName, typeIcon, aName, aColor, rName, rColor, teamName sql.NullString
-	var pKey, pTitle, desc, startDate, dueDate sql.NullString
+	var pKey, pTitle, desc, startDate, dueDate, archivedAt sql.NullString
 	var bo sql.NullFloat64
 	err := s.db.QueryRow(`SELECT i.id, i.key, i.project_id, i.title, i.description,
 		i.type_id, t.name, t.icon,
@@ -171,7 +173,7 @@ func (s *server) getIssueDetail(key string) (*issueDetail, error) {
 		i.reporter_id, rp.name, rp.avatar_color,
 		i.team_id, tm.name,
 		i.parent_id, p.key, p.title,
-		i.start_date, i.due_date, i.board_order, i.created_at, i.updated_at
+		i.start_date, i.due_date, i.board_order, i.archived_at, i.created_at, i.updated_at
 		FROM issues i
 		JOIN statuses st ON st.id = i.status_id
 		LEFT JOIN issue_types t ON t.id = i.type_id
@@ -187,7 +189,7 @@ func (s *server) getIssueDetail(key string) (*issueDetail, error) {
 		&reporterID, &rName, &rColor,
 		&teamID, &teamName,
 		&parentID, &pKey, &pTitle,
-		&startDate, &dueDate, &bo, &d.CreatedAt, &d.UpdatedAt)
+		&startDate, &dueDate, &bo, &archivedAt, &d.CreatedAt, &d.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -211,6 +213,7 @@ func (s *server) getIssueDetail(key string) (*issueDetail, error) {
 	d.StartDate = nullStr(startDate)
 	d.DueDate = nullStr(dueDate)
 	d.BoardOrder = bo.Float64
+	d.ArchivedAt = nullStr(archivedAt)
 
 	d.Sprints = make([]sprintRef, 0)
 	rows, err := s.db.Query(`SELECT sp.id, sp.name, sp.state FROM sprints sp
@@ -628,6 +631,18 @@ func (s *server) patchIssue(w http.ResponseWriter, r *http.Request) {
 		}
 		if id != curStatus {
 			statusChange = &id
+		}
+	}
+	if v, present := body["archived"]; present {
+		b, isBool := v.(bool)
+		if !isBool {
+			writeErr(w, http.StatusBadRequest, "archived must be a boolean")
+			return
+		}
+		if b {
+			sets = append(sets, "archived_at = datetime('now')")
+		} else {
+			sets = append(sets, "archived_at = NULL")
 		}
 	}
 	if v, present := body["parent_id"]; present {

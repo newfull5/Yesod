@@ -59,6 +59,7 @@ func RegisterRoutes(mux *http.ServeMux, d *sql.DB) {
 	api.HandleFunc("POST /api/teams", s.createTeam)
 	api.HandleFunc("GET /api/statuses", s.listStatuses)
 	api.HandleFunc("POST /api/statuses", s.createStatus)
+	api.HandleFunc("POST /api/statuses/{id}/clear", s.clearStatus)
 
 	api.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, "not found")

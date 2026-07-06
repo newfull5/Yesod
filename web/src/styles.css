@@ -385,6 +385,42 @@ section {
   font-size: 12px;
 }
 
+.col-clear {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--faint);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 20px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+
+.col-head:hover .col-clear,
+.col-clear.armed {
+  opacity: 1;
+}
+
+.col-clear:hover {
+  background: var(--hover-bg);
+  color: var(--accent);
+}
+
+.col-clear.armed {
+  background: var(--accent);
+  color: #fff;
+}
+
+.col-clear:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .col-cards {
   display: flex;
   flex-direction: column;
@@ -539,6 +575,97 @@ section {
   color: var(--faint);
   background: var(--filter-bg);
   padding: 7px 12px;
+}
+
+/* ---- add column ---- */
+
+.add-column-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  align-self: flex-start;
+  margin-top: 2px;
+  background: none;
+  border: 1.5px dashed var(--border-2);
+  border-radius: 10px;
+  color: var(--faint);
+  padding: 9px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.12s ease, color 0.12s ease, background 0.12s ease;
+}
+
+.add-column-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--hover-bg);
+}
+
+.add-column {
+  flex: 0 0 280px;
+  align-self: flex-start;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(30, 20, 60, 0.03), 0 4px 14px rgba(103, 65, 183, 0.1);
+}
+
+.add-column form {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.add-column-input {
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius);
+  padding: 7px 10px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.add-column-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.add-column-cats {
+  display: flex;
+  gap: 6px;
+}
+
+.cat-pick {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  background: none;
+  border: 1px solid var(--border-2);
+  border-radius: 20px;
+  padding: 4px 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+
+.cat-pick:hover {
+  border-color: #d9cdee;
+}
+
+.cat-pick.active {
+  border-color: var(--accent);
+  background: var(--hover-bg);
+  color: var(--accent);
+}
+
+.add-column-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 /* ---- dialogs / modal ---- */
@@ -1116,6 +1243,64 @@ section {
 .backlog-row:hover {
   border-color: #d9cdee;
   box-shadow: 0 2px 8px rgba(103, 65, 183, 0.08);
+}
+
+/* ---- backlog archive ---- */
+
+.backlog-section.archive {
+  background: var(--filter-bg, #faf9fc);
+  border-style: dashed;
+}
+
+.archive-toggle {
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  align-items: center;
+  text-align: left;
+  padding-bottom: 0;
+}
+
+.backlog-section.archive:has(.backlog-row) .archive-toggle {
+  padding-bottom: 10px;
+}
+
+.archive-toggle .chevron {
+  color: var(--faint);
+  transition: transform 0.15s ease;
+}
+
+.archive-toggle .chevron.open {
+  transform: rotate(90deg);
+}
+
+.backlog-row.archived {
+  cursor: pointer;
+  opacity: 0.75;
+}
+
+.backlog-row.archived:hover {
+  opacity: 1;
+}
+
+.archived-date {
+  margin-left: auto;
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+.archived-chip {
+  background: var(--count-pill);
+  color: var(--muted);
+  border-radius: 20px;
+  padding: 2px 9px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-left: 8px;
 }
 
 /* ---- login ---- */
