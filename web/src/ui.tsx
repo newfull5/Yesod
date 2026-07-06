@@ -1,4 +1,5 @@
 // Small shared presentational bits.
+import { useEffect, useRef, useState } from 'react'
 
 // Minimal hand-drawn glyphs (16x16, stroke=currentColor) — no icon library needed for four shapes.
 const TYPE_GLYPH: Record<string, React.ReactNode> = {
@@ -18,14 +19,14 @@ const TYPE_GLYPH: Record<string, React.ReactNode> = {
 }
 
 export const TYPE_COLOR: Record<string, string> = {
-  story: '#36b37e',
-  bug: '#e5493a',
-  task: '#4bade8',
-  epic: '#904ee2',
+  story: '#2FAE73',
+  bug: '#E5493A',
+  task: '#4C8DE0',
+  epic: '#8B4FE0',
 }
 
 export function typeColor(t: { icon: string } | null): string {
-  return (t && TYPE_COLOR[t.icon]) || '#64748b'
+  return (t && TYPE_COLOR[t.icon]) || '#9B95B3'
 }
 
 export function TypeIcon({ t }: { t: { name: string; icon: string } | null }) {
@@ -64,6 +65,14 @@ export const IconCalendar = fieldIcon(<><rect x="2.5" y="3.5" width="11" height=
 export const IconTeam = fieldIcon(<><circle cx="5.5" cy="6" r="2" /><circle cx="11" cy="7" r="1.6" /><path d="M2 13c0-2.2 1.6-3.5 3.5-3.5S9 10.8 9 13M9.3 9.8c1.6.1 2.7 1.2 2.7 3.2" /></>)
 export const IconClock = fieldIcon(<><circle cx="8" cy="8" r="5.5" /><path d="M8 5v3l2 1.5" /></>)
 
+function ChevronDown() {
+  return (
+    <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" style={{ flex: '0 0 auto' }}>
+      <path d="M4 6l4 4 4-4" />
+    </svg>
+  )
+}
+
 export function Avatar({ p, size = 24 }: { p: { name: string; avatar_color?: string | null }; size?: number }) {
   const initials = p.name
     .split(/\s+/)
@@ -76,7 +85,7 @@ export function Avatar({ p, size = 24 }: { p: { name: string; avatar_color?: str
     <span
       className="avatar"
       title={p.name}
-      style={{ width: size, height: size, fontSize: Math.round(size * 0.42), background: p.avatar_color || '#64748b' }}
+      style={{ width: size, height: size, fontSize: Math.round(size * 0.42), background: p.avatar_color || '#9B95B3' }}
     >
       {initials}
     </span>
@@ -96,5 +105,73 @@ export function DueBadge({ due }: { due: string | null }) {
     <span className={'due' + (dueUrgent(due) ? ' hot' : '')} title={'Due ' + due}>
       {due}
     </span>
+  )
+}
+
+// ---- Dropdown: single reusable popover replacing every native <select>. ----
+
+export type DropdownOption = { value: string; label: React.ReactNode; render?: React.ReactNode }
+
+export function Dropdown({
+  value,
+  options,
+  onChange,
+  placeholder = 'Select…',
+  className = '',
+  renderValue,
+}: {
+  value: string
+  options: DropdownOption[]
+  onChange: (value: string) => void
+  placeholder?: string
+  className?: string
+  renderValue?: (opt: DropdownOption | undefined) => React.ReactNode
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onDocDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
+    document.addEventListener('mousedown', onDocDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDocDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  const current = options.find((o) => o.value === value)
+
+  return (
+    <div className={'dropdown ' + className} ref={ref}>
+      <button type="button" className="dropdown-trigger" onClick={() => setOpen((o) => !o)}>
+        <span className="dropdown-value">
+          {renderValue ? renderValue(current) : current ? current.label : <span className="placeholder">{placeholder}</span>}
+        </span>
+        <ChevronDown />
+      </button>
+      {open && (
+        <div className="dropdown-panel">
+          {options.map((o) => (
+            <button
+              type="button"
+              key={o.value}
+              className="dropdown-option"
+              onClick={() => {
+                onChange(o.value)
+                setOpen(false)
+              }}
+            >
+              <span className="dropdown-check">{o.value === value ? '✓' : ''}</span>
+              {o.render ?? o.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }

@@ -185,6 +185,8 @@ export default function Board({ projectId, filters, version, onOpen }: Props) {
   )
 }
 
+const COL_DOT: Record<string, string> = { todo: '#B0AAC7', in_progress: '#6741B7', done: '#2FAE73' }
+
 function BoardColumn({
   col,
   cards,
@@ -200,7 +202,9 @@ function BoardColumn({
   return (
     <section className={'column' + (isOver ? ' drop-target' : '')}>
       <div className="col-head">
-        {col.name} <span className="count">{cards.length}</span>
+        <span className="col-dot" style={{ background: COL_DOT[col.category] || '#B0AAC7' }} />
+        {col.name}
+        <span className="count">{cards.length}</span>
       </div>
       <SortableContext items={cards.map((c) => c.key)} strategy={verticalListSortingStrategy}>
         <div ref={setNodeRef} className="col-cards">
@@ -255,46 +259,66 @@ function QuickAdd({ onAdd }: { onAdd: (title: string) => Promise<void> }) {
   const [title, setTitle] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onDocDown = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onDocDown)
+    return () => document.removeEventListener('mousedown', onDocDown)
+  }, [open])
+
   if (!open) {
     return (
-      <button className="quickadd-btn" onClick={() => setOpen(true)}>
-        + Create
+      <button
+        className="quickadd-btn"
+        onClick={() => {
+          setOpen(true)
+          setTitle('')
+          setErr('')
+        }}
+      >
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <path d="M8 2v12M2 8h12" />
+        </svg>
+        Create
       </button>
     )
   }
   return (
-    <form
-      className="quickadd"
-      onSubmit={(e) => {
-        e.preventDefault()
-        const t = title.trim()
-        if (!t || busy) return
-        setBusy(true)
-        onAdd(t)
-          .then(() => {
-            setTitle('')
-            setErr('')
-          })
-          .catch((er: Error) => setErr(er.message))
-          .finally(() => setBusy(false))
-      }}
-    >
-      <input
-        placeholder="What needs to be done?"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}
-        autoFocus
-      />
-      <div className="quickadd-actions">
-        <button type="submit" className="btn primary" disabled={!title.trim() || busy}>
-          Add
-        </button>
-        <button type="button" className="btn" onClick={() => setOpen(false)}>
-          Cancel
-        </button>
-      </div>
-      {err && <p className="error">{err}</p>}
-    </form>
+    <div className="quickadd" ref={wrapRef}>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          const t = title.trim()
+          if (!t || busy) return
+          setBusy(true)
+          onAdd(t)
+            .then(() => {
+              setTitle('')
+              setErr('')
+              inputRef.current?.focus()
+            })
+            .catch((er: Error) => setErr(er.message))
+            .finally(() => setBusy(false))
+        }}
+      >
+        <div className="quickadd-key">YS-</div>
+        <input
+          ref={inputRef}
+          className="quickadd-input"
+          placeholder="Issue title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}
+          autoFocus
+        />
+        {err && <p className="error">{err}</p>}
+      </form>
+      <div className="quickadd-hint">Press Enter to add another issue</div>
+    </div>
   )
 }

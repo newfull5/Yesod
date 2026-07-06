@@ -4,8 +4,8 @@ import { api, LINK_TYPES } from './api'
 import type { Card, Detail, Person, Sprint, Status, Team } from './api'
 import {
   Avatar,
+  Dropdown,
   IconCalendar,
-  IconClock,
   IconParent,
   IconPerson,
   IconSprint,
@@ -102,10 +102,10 @@ export default function IssueModal({
                   </>
                 )}
                 <TypeIcon t={issue.type} />
-                <span className="key">{issue.key}</span>
+                <span className="modal-key">{issue.key}</span>
               </span>
               <span className="spacer" />
-              <button className="btn subtle" onClick={remove} title="Delete issue">
+              <button className="btn danger-ghost" onClick={remove} title="Delete issue">
                 Delete
               </button>
               <button className="btn subtle" onClick={onClose} title="Close">
@@ -128,13 +128,11 @@ export default function IssueModal({
               </div>
               <aside className="modal-side">
                 <Field label="Status" icon={IconStatus}>
-                  <select value={issue.status.id} onChange={(e) => patch({ status_id: Number(e.target.value) })}>
-                    {statuses.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
+                  <Dropdown
+                    value={String(issue.status.id)}
+                    options={statuses.map((s) => ({ value: String(s.id), label: s.name }))}
+                    onChange={(v) => patch({ status_id: Number(v) })}
+                  />
                 </Field>
                 <Field label="Assignee" icon={IconPerson}>
                   <PersonSelect
@@ -175,39 +173,40 @@ export default function IssueModal({
                 <Field label="Parent" icon={IconParent}>
                   <ParentPicker issue={issue} projectId={projectId} onPick={(id) => patch({ parent_id: id })} />
                 </Field>
-                <Field label="Start date" icon={IconCalendar}>
-                  <input
-                    type="date"
-                    value={issue.start_date ?? ''}
-                    onChange={(e) => patch({ start_date: e.target.value || null })}
-                  />
-                </Field>
-                <Field label="Due date" icon={IconCalendar}>
-                  <input
-                    type="date"
-                    value={issue.due_date ?? ''}
-                    onChange={(e) => patch({ due_date: e.target.value || null })}
-                  />
-                </Field>
+                <div className="field-row">
+                  <Field label="Start date" icon={IconCalendar}>
+                    <input
+                      type="date"
+                      value={issue.start_date ?? ''}
+                      onChange={(e) => patch({ start_date: e.target.value || null })}
+                    />
+                  </Field>
+                  <Field label="Due date" icon={IconCalendar}>
+                    <input
+                      type="date"
+                      value={issue.due_date ?? ''}
+                      onChange={(e) => patch({ due_date: e.target.value || null })}
+                    />
+                  </Field>
+                </div>
                 <Field label="Team" icon={IconTeam}>
-                  <select
-                    value={issue.team?.id ?? ''}
-                    onChange={(e) => patch({ team_id: e.target.value ? Number(e.target.value) : null })}
-                  >
-                    <option value="">None</option>
-                    {teams.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
-                      </option>
-                    ))}
-                  </select>
+                  <Dropdown
+                    value={issue.team ? String(issue.team.id) : ''}
+                    placeholder="None"
+                    options={[{ value: '', label: 'None' }, ...teams.map((t) => ({ value: String(t.id), label: t.name }))]}
+                    onChange={(v) => patch({ team_id: v ? Number(v) : null })}
+                  />
                 </Field>
-                <Field label="Created" icon={IconClock}>
-                  <span className="muted">{issue.created_at} UTC</span>
-                </Field>
-                <Field label="Updated" icon={IconClock}>
-                  <span className="muted">{issue.updated_at} UTC</span>
-                </Field>
+                <div className="modal-meta">
+                  <div className="meta-row">
+                    <span className="muted">Created</span>
+                    <span>{issue.created_at} UTC</span>
+                  </div>
+                  <div className="meta-row">
+                    <span className="muted">Updated</span>
+                    <span>{issue.updated_at} UTC</span>
+                  </div>
+                </div>
               </aside>
             </div>
           </>
@@ -249,14 +248,13 @@ function PersonSelect({
   return (
     <div className="person-select">
       {value && <Avatar p={value} size={20} />}
-      <select value={value?.id ?? ''} onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}>
-        <option value="">Unassigned</option>
-        {people.map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.name}
-          </option>
-        ))}
-      </select>
+      <Dropdown
+        className="person-select-dropdown"
+        value={value ? String(value.id) : ''}
+        placeholder="Unassigned"
+        options={[{ value: '', label: 'Unassigned' }, ...people.map((p) => ({ value: String(p.id), label: p.name }))]}
+        onChange={(v) => onChange(v ? Number(v) : null)}
+      />
     </div>
   )
 }
@@ -361,6 +359,7 @@ function Subtasks({
   return (
     <section>
       <h3>Subtasks</h3>
+      {issue.subtasks.length === 0 && <div className="empty-box">No subtasks yet</div>}
       {issue.subtasks.map((st) => (
         <div className="row" key={st.key}>
           <button className="linklike" onClick={() => onOpen(st.key)}>
@@ -414,6 +413,7 @@ function Links({
   return (
     <section>
       <h3>Linked issues</h3>
+      {Object.keys(issue.links).length === 0 && <div className="empty-box">No linked issues</div>}
       {Object.entries(issue.links).map(([type, items]) => (
         <div key={type}>
           <div className="link-type">{type}</div>
@@ -456,13 +456,12 @@ function Links({
             .catch((er: Error) => setErr(er.message))
         }}
       >
-        <select value={linkType} onChange={(e) => setLinkType(e.target.value)}>
-          {LINK_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
+        <Dropdown
+          className="link-type-dropdown"
+          value={linkType}
+          options={LINK_TYPES.map((t) => ({ value: t, label: t }))}
+          onChange={setLinkType}
+        />
         <input placeholder="Issue key (e.g. YS-3)" value={linkedKey} onChange={(e) => setLinkedKey(e.target.value)} />
         <button type="submit" className="btn" disabled={!linkedKey.trim()}>
           Link
