@@ -76,7 +76,7 @@ export default function App() {
     <>
       <header className="topbar">
         <span className="brand">
-          <img src="/logo.png" alt="Yesod" className="brand-logo" />
+          <img src="logo.png" alt="Yesod" className="brand-logo" />
           Yesod
         </span>
 
@@ -256,7 +256,7 @@ function Login({ onDone }: { onDone: () => void }) {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginBottom: '20px' }}>
-          <img src="/logo.png" alt="Yesod" style={{ width: '48px', height: '48px', borderRadius: '8px' }} />
+          <img src="logo.png" alt="Yesod" style={{ width: '48px', height: '48px', borderRadius: '8px' }} />
           <h1 style={{ margin: 0, fontSize: '32px' }}>Yesod</h1>
         </div>
         <input
