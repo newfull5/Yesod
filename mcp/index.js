@@ -88,6 +88,7 @@ function card(i) {
   if (i.type) line += ` (${i.type.name})`
   if (i.assignee) line += ` @${i.assignee.name}`
   if (i.due_date) line += ` due ${i.due_date}`
+  if (i.archived_at) line += ' [archived]'
   return line
 }
 
@@ -125,11 +126,30 @@ const text = s => ({ content: [{ type: 'text', text: s }] })
 const keyParam = z.string().describe('Issue key, e.g. "YS-3" (project prefix, dash, number).')
 const dateParam = desc => z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'must be YYYY-MM-DD').describe(desc)
 const projectParam = z.number().int().optional()
-  .describe('Project id (integer). Defaults to 1, the seed project "Yesod" (key prefix YS).')
+  .describe('Project id (integer). Defaults to 1, the seed project. Use list_projects to see all projects.')
 
 // ---- Server & tools ------------------------------------------------------
 
-const server = new McpServer({ name: 'yesod', version: '0.1.0' })
+const server = new McpServer({ name: 'yesod', version: '0.2.0' })
+
+server.registerTool('list_projects', {
+  description: 'List all projects: id, key prefix and name. Issue keys are "<prefix>-<n>", e.g. project with prefix YS owns YS-1, YS-2, …',
+  inputSchema: {},
+}, async () => {
+  const projects = await api('GET', '/projects')
+  return text(projects.map(p => `#${p.id} ${p.key_prefix} — ${p.name}`).join('\n'))
+})
+
+server.registerTool('create_project', {
+  description: 'Create a new project with its own board (To Do / In Progress / Done) and issue key prefix. Returns the new project id.',
+  inputSchema: {
+    name: z.string().min(1).describe('Project name, e.g. "Blog".'),
+    key_prefix: z.string().min(1).describe('Issue key prefix, uppercase, no spaces/dashes, e.g. "BL" — issues become BL-1, BL-2, …'),
+  },
+}, async ({ name, key_prefix }) => {
+  const p = await api('POST', '/projects', { name, key_prefix })
+  return text(`Created project #${p.id} ${p.key_prefix} — ${p.name}`)
+})
 
 server.registerTool('list_issues', {
   description: 'List issues in the Yesod issue tracker, optionally filtered. All filters combine with AND. Returns one compact line per issue: key, title, [status], (type), @assignee, due date. Use get_issue for full details of a single issue.',
@@ -204,10 +224,12 @@ server.registerTool('update_issue', {
     start_date: dateParam('New start date as YYYY-MM-DD.').nullable().optional().describe('New start date as YYYY-MM-DD, or null to clear.'),
     due_date: dateParam('New due date as YYYY-MM-DD.').nullable().optional().describe('New due date as YYYY-MM-DD, or null to clear.'),
     sprint_ids: z.array(z.number().int()).optional().describe('Full new set of sprint ids — REPLACES existing sprints; [] removes the issue from all sprints.'),
+    archived: z.boolean().optional().describe('true archives the issue (leaves the board, kept in Backlog → Archive); false restores it.'),
   },
 }, async (a) => {
   const key = a.key.trim()
   const patch = {}
+  if (a.archived !== undefined) patch.archived = a.archived
   if (a.title !== undefined) patch.title = a.title
   if (a.description !== undefined) patch.description = a.description
   if (a.type !== undefined) patch.type_id = resolveType(a.type)
@@ -252,6 +274,82 @@ server.registerTool('add_comment', {
   return text(`Comment added to ${key.trim()} by ${c.author ? c.author.name : 'anonymous'} at ${c.created_at}: ${c.body}`)
 })
 
+server.registerTool('link_issues', {
+  description: 'Link two issues. link_type is directional from the first issue: "YS-1 blocks YS-2" means YS-2 cannot proceed until YS-1 is done.',
+  inputSchema: {
+    key: keyParam,
+    link_type: z.enum(['blocks', 'is blocked by', 'relates to']).describe('Relationship from key to linked_key.'),
+    linked_key: z.string().describe('Key of the issue to link to, e.g. "YS-5".'),
+  },
+}, async ({ key, link_type, linked_key }) => {
+  await api('POST', `/issues/${encodeURIComponent(key.trim())}/links`, { link_type, linked_key: linked_key.trim() })
+  return text(`Linked: ${key.trim()} ${link_type} ${linked_key.trim()}`)
+})
+
+server.registerTool('unlink_issues', {
+  description: 'Remove an existing link between two issues. Must match the original direction and link_type (see get_issue\'s Links section).',
+  inputSchema: {
+    key: keyParam,
+    link_type: z.enum(['blocks', 'is blocked by', 'relates to']).describe('Relationship of the existing link.'),
+    linked_key: z.string().describe('Key of the linked issue.'),
+  },
+}, async ({ key, link_type, linked_key }) => {
+  await api('DELETE', `/issues/${encodeURIComponent(key.trim())}/links`, { link_type, linked_key: linked_key.trim() })
+  return text(`Unlinked: ${key.trim()} ${link_type} ${linked_key.trim()}`)
+})
+
+server.registerTool('list_statuses', {
+  description: 'List the board columns (statuses) of a project: name and category (todo/in_progress/done). These are the valid values for the "status" params.',
+  inputSchema: { project_id: projectParam },
+}, async ({ project_id = 1 }) => {
+  const statuses = await api('GET', `/statuses?project_id=${project_id}`)
+  return text(statuses.map(s => `${s.name} (${s.category})`).join('\n'))
+})
+
+server.registerTool('add_column', {
+  description: 'Add a new board column (status) to a project. It appears after the existing columns.',
+  inputSchema: {
+    project_id: projectParam,
+    name: z.string().min(1).describe('Column name, e.g. "In Review".'),
+    category: z.enum(['todo', 'in_progress', 'done']).describe('Column category (controls color and done-column behavior).'),
+  },
+}, async ({ project_id = 1, name, category }) => {
+  const s = await api('POST', '/statuses', { project_id, name, category })
+  return text(`Added column "${s.name}" (${s.category}) to project ${project_id}`)
+})
+
+server.registerTool('list_people', {
+  description: 'List all people (usable as assignee/reporter/comment author names).',
+  inputSchema: {},
+}, async () => {
+  const people = await api('GET', '/people')
+  return text(people.length ? people.map(p => p.name).join('\n') : 'No people yet.')
+})
+
+server.registerTool('create_person', {
+  description: 'Add a person so they can be assigned to issues.',
+  inputSchema: { name: z.string().min(1).describe('Person name, e.g. "Saechan".') },
+}, async ({ name }) => {
+  const p = await api('POST', '/people', { name })
+  return text(`Added person ${p.name}`)
+})
+
+server.registerTool('list_teams', {
+  description: 'List all teams (usable as the team name on issues).',
+  inputSchema: {},
+}, async () => {
+  const teams = await api('GET', '/teams')
+  return text(teams.length ? teams.map(t => t.name).join('\n') : 'No teams yet.')
+})
+
+server.registerTool('create_team', {
+  description: 'Add a team so issues can be tagged with it.',
+  inputSchema: { name: z.string().min(1).describe('Team name, e.g. "Platform".') },
+}, async ({ name }) => {
+  const t = await api('POST', '/teams', { name })
+  return text(`Added team ${t.name}`)
+})
+
 server.registerTool('list_sprints', {
   description: 'List sprints of a project with their id, dates and state (future/active/closed). Use the returned ids as sprint_ids in create_issue/update_issue or sprint_id in list_issues.',
   inputSchema: { project_id: projectParam },
@@ -261,5 +359,42 @@ server.registerTool('list_sprints', {
     ? sprints.map(s => `#${s.id} ${s.name} [${s.state}]${s.start_date ? ` ${s.start_date}` : ''}${s.end_date ? ` → ${s.end_date}` : ''}`).join('\n')
     : 'No sprints in this project.')
 })
+
+server.registerTool('create_sprint', {
+  description: 'Create a sprint in a project. State defaults to "future"; set it to "active" to start it immediately.',
+  inputSchema: {
+    project_id: projectParam,
+    name: z.string().min(1).describe('Sprint name, e.g. "Sprint 3".'),
+    start_date: dateParam('Start date as YYYY-MM-DD.').optional(),
+    end_date: dateParam('End date as YYYY-MM-DD.').optional(),
+    state: z.enum(['future', 'active', 'closed']).optional().describe('Sprint state. Defaults to "future".'),
+  },
+}, async ({ project_id = 1, name, start_date, end_date, state }) => {
+  const body = { project_id, name }
+  if (start_date !== undefined) body.start_date = start_date
+  if (end_date !== undefined) body.end_date = end_date
+  if (state !== undefined) body.state = state
+  const s = await api('POST', '/sprints', body)
+  return text(`Created sprint #${s.id} ${s.name} [${s.state}]`)
+})
+
+server.registerTool('update_sprint', {
+  description: 'Update a sprint by id: rename, change dates (null clears a date), or change state (future/active/closed).',
+  inputSchema: {
+    sprint_id: z.number().int().describe('Sprint id (integer). Use list_sprints to find it.'),
+    name: z.string().min(1).optional().describe('New sprint name.'),
+    start_date: dateParam('New start date as YYYY-MM-DD.').nullable().optional().describe('New start date, or null to clear.'),
+    end_date: dateParam('New end date as YYYY-MM-DD.').nullable().optional().describe('New end date, or null to clear.'),
+    state: z.enum(['future', 'active', 'closed']).optional().describe('New sprint state.'),
+  },
+}, async ({ sprint_id, ...a }) => {
+  const patch = {}
+  for (const f of ['name', 'start_date', 'end_date', 'state']) if (a[f] !== undefined) patch[f] = a[f]
+  if (Object.keys(patch).length === 0) throw new Error('nothing to update — pass at least one field besides sprint_id')
+  const s = await api('PATCH', `/sprints/${sprint_id}`, patch)
+  return text(`Updated sprint #${s.id} ${s.name} [${s.state}]${s.start_date ? ` ${s.start_date}` : ''}${s.end_date ? ` → ${s.end_date}` : ''}`)
+})
+
+// ponytail: no delete_issue tool — hard delete is irreversible, keep it UI-only.
 
 await server.connect(new StdioServerTransport())

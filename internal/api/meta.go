@@ -57,13 +57,32 @@ func (s *server) createProject(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "key_prefix must be non-empty without spaces or dashes")
 		return
 	}
-	res, err := s.db.Exec(`INSERT INTO projects (key_prefix, name) VALUES (?, ?)`, req.KeyPrefix, req.Name)
+	tx, err := s.db.Begin()
+	if err != nil {
+		dbErr(w, err)
+		return
+	}
+	defer tx.Rollback()
+	res, err := tx.Exec(`INSERT INTO projects (key_prefix, name) VALUES (?, ?)`, req.KeyPrefix, req.Name)
 	if err != nil {
 		dbErr(w, err) // UNIQUE key_prefix -> 409
 		return
 	}
 	id, err := res.LastInsertId()
 	if err != nil {
+		dbErr(w, err)
+		return
+	}
+	// New projects start with the same default board as the seed project,
+	// so their board is usable immediately.
+	if _, err := tx.Exec(`INSERT INTO statuses (project_id, name, category, board_order) VALUES
+		(?, 'To Do', 'todo', 1),
+		(?, 'In Progress', 'in_progress', 2),
+		(?, 'Done', 'done', 3)`, id, id, id); err != nil {
+		dbErr(w, err)
+		return
+	}
+	if err := tx.Commit(); err != nil {
 		dbErr(w, err)
 		return
 	}

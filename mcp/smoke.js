@@ -36,7 +36,9 @@ try {
 
   const { tools } = await client.listTools()
   const names = tools.map((t) => t.name).sort()
-  for (const want of ['add_comment', 'assign_to_me', 'create_issue', 'get_issue', 'list_issues', 'list_sprints', 'update_issue']) {
+  for (const want of ['add_comment', 'assign_to_me', 'create_issue', 'get_issue', 'list_issues', 'list_sprints', 'update_issue',
+    'list_projects', 'create_project', 'list_statuses', 'add_column', 'link_issues', 'unlink_issues',
+    'list_people', 'create_person', 'list_teams', 'create_team', 'create_sprint', 'update_sprint']) {
     assert(names.includes(want), `missing tool ${want}; got ${names}`)
   }
   assert(tools.every((t) => t.description.length > 20), 'every tool has a rich description')
@@ -65,6 +67,38 @@ try {
 
   const sprints = await call('list_sprints', {})
   assert(typeof sprints === 'string' && sprints.length > 0, 'list_sprints returns text')
+
+  // v0.2.0 tools — issue key number makes names/prefixes unique per run.
+  const run = key.match(/\d+/)[0]
+
+  const projects = await call('list_projects', {})
+  assert(projects.includes('#1'), `list_projects: ${projects}`)
+  const proj = await call('create_project', { name: `Smoke ${run}`, key_prefix: `SM${run}` })
+  const pid = Number(proj.match(/#(\d+)/)?.[1])
+  assert(pid > 1, `create_project: ${proj}`)
+  const cols = await call('list_statuses', { project_id: pid })
+  assert(cols.includes('To Do (todo)') && cols.includes('Done (done)'), `default columns seeded: ${cols}`)
+  const added = await call('add_column', { project_id: pid, name: 'In Review', category: 'in_progress' })
+  assert(added.includes('In Review'), `add_column: ${added}`)
+
+  const other = await call('create_issue', { title: 'Smoke link target' })
+  const otherKey = other.match(/[A-Z]+-\d+/)?.[0]
+  const linked = await call('link_issues', { key, link_type: 'blocks', linked_key: otherKey })
+  assert(linked.includes('blocks'), `link_issues: ${linked}`)
+  assert((await call('get_issue', { key })).includes(otherKey), `link visible in get_issue`)
+  await call('unlink_issues', { key, link_type: 'blocks', linked_key: otherKey })
+
+  const sp = await call('create_sprint', { name: `Smoke sprint ${run}`, state: 'active' })
+  const spId = Number(sp.match(/#(\d+)/)?.[1])
+  const spUpd = await call('update_sprint', { sprint_id: spId, state: 'closed' })
+  assert(spUpd.includes('[closed]'), `update_sprint: ${spUpd}`)
+
+  const archived = await call('update_issue', { key: otherKey, archived: true })
+  assert(archived.includes('[archived]'), `archive marker: ${archived}`)
+
+  assert((await call('list_people', {})).includes('Smoke Tester'), 'list_people includes Smoke Tester')
+  await call('create_team', { name: `Smoke team ${run}` })
+  assert((await call('list_teams', {})).includes(`Smoke team ${run}`), 'list_teams includes new team')
 
   console.log(`SMOKE OK (${key})`)
   process.exitCode = 0

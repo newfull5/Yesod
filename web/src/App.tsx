@@ -24,6 +24,7 @@ export default function App() {
   const [view, setView] = useState<'board' | 'backlog'>(location.hash === '#backlog' ? 'backlog' : 'board')
   const [modalKey, setModalKey] = useState<string | null>(null)
   const [creating, setCreating] = useState<{ statusId?: number } | null>(null)
+  const [newProject, setNewProject] = useState(false)
   const [version, setVersion] = useState(0)
   const bump = useCallback(() => setVersion((v) => v + 1), [])
 
@@ -78,30 +79,25 @@ export default function App() {
           Yesod
         </span>
 
-        {projects.length > 1 ? (
-          <Dropdown
-            className="project-picker"
-            value={String(projectId ?? '')}
-            options={projects.map((p) => ({ value: String(p.id), label: `${p.key_prefix} — ${p.name}` }))}
-            onChange={(v) => {
-              setProjectId(Number(v))
-              setFilters(NO_FILTERS)
-            }}
-            renderValue={() => (
-              <>
-                <span className="project-dot" />
-                {project ? `${project.key_prefix} — ${project.name}` : 'Select project'}
-              </>
-            )}
-          />
-        ) : (
-          project && (
-            <span className="project-picker project-picker-static">
+        <Dropdown
+          className="project-picker"
+          value={String(projectId ?? '')}
+          options={[
+            ...projects.map((p) => ({ value: String(p.id), label: `${p.key_prefix} — ${p.name}` })),
+            { value: 'new', label: '+ New project' },
+          ]}
+          onChange={(v) => {
+            if (v === 'new') return setNewProject(true)
+            setProjectId(Number(v))
+            setFilters(NO_FILTERS)
+          }}
+          renderValue={() => (
+            <>
               <span className="project-dot" />
-              {project.key_prefix} — {project.name}
-            </span>
-          )
-        )}
+              {project ? `${project.key_prefix} — ${project.name}` : 'Select project'}
+            </>
+          )}
+        />
 
         <nav>
           <a href="#" className={view === 'board' ? 'active' : ''}>
@@ -172,6 +168,18 @@ export default function App() {
         )}
       </main>
 
+      {newProject && (
+        <NewProject
+          onClose={() => setNewProject(false)}
+          onCreated={(p) => {
+            setNewProject(false)
+            setProjects((ps) => [...(ps ?? []), p])
+            setProjectId(p.id)
+            setFilters(NO_FILTERS)
+          }}
+        />
+      )}
+
       {creating && projectId != null && (
         <CreateIssue
           projectId={projectId}
@@ -234,6 +242,60 @@ function Login({ onDone }: { onDone: () => void }) {
           Log in
         </button>
         {err && <p className="error">{err}</p>}
+      </form>
+    </div>
+  )
+}
+
+function NewProject({ onClose, onCreated }: { onClose: () => void; onCreated: (p: Project) => void }) {
+  const [name, setName] = useState('')
+  const [key, setKey] = useState('')
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
+  return (
+    <div className="backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <form
+        className="dialog"
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (!name.trim() || !key.trim() || busy) return
+          setBusy(true)
+          api<Project>('/projects', 'POST', { name: name.trim(), key_prefix: key.trim() })
+            .then(onCreated)
+            .catch((er: Error) => {
+              setErr(er.message)
+              setBusy(false)
+            })
+        }}
+      >
+        <div className="dialog-head">
+          <h2>New project</h2>
+        </div>
+        <div className="dialog-body">
+          <div className="field">
+            <div className="field-label">Name</div>
+            <input placeholder="Project name" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+          </div>
+          <div className="field">
+            <div className="field-label">Key</div>
+            <input
+              placeholder="e.g. YS"
+              value={key}
+              maxLength={10}
+              onChange={(e) => setKey(e.target.value.toUpperCase())}
+            />
+            <p className="field-hint">Issue keys become {key.trim() || 'KEY'}-1, {key.trim() || 'KEY'}-2, …</p>
+          </div>
+        </div>
+        {err && <p className="error dialog-error">{err}</p>}
+        <div className="dialog-actions">
+          <button type="button" className="btn" onClick={onClose}>
+            Cancel
+          </button>
+          <button type="submit" className="btn primary" disabled={!name.trim() || !key.trim() || busy}>
+            Create
+          </button>
+        </div>
       </form>
     </div>
   )
