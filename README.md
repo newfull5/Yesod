@@ -12,6 +12,8 @@ Yesod is for that use case. It is meant to be simple to run, light on resources,
 
 <sub>The name is motivated by my favorite game.</sub>
 
+<p align="center"><img src="docs/demo.gif" alt="Yesod demo — create an issue, drag it across the board, open its detail" width="760"></p>
+
 ## Run
 
 ```bash
