@@ -196,9 +196,9 @@ function BoardColumn({
   onOpen: (key: string) => void
   onQuickAdd: (title: string) => Promise<void>
 }) {
-  const { setNodeRef } = useDroppable({ id: `col-${col.id}` })
+  const { setNodeRef, isOver } = useDroppable({ id: `col-${col.id}` })
   return (
-    <section className="column">
+    <section className={'column' + (isOver ? ' drop-target' : '')}>
       <div className="col-head">
         {col.name} <span className="count">{cards.length}</span>
       </div>
