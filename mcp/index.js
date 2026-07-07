@@ -130,7 +130,7 @@ const projectParam = z.number().int().optional()
 
 // ---- Server & tools ------------------------------------------------------
 
-const server = new McpServer({ name: 'yesod', version: '0.2.0' })
+const server = new McpServer({ name: 'yesod', version: '0.3.0' })
 
 server.registerTool('list_projects', {
   description: 'List all projects: id, key prefix and name. Issue keys are "<prefix>-<n>", e.g. project with prefix YS owns YS-1, YS-2, …',
@@ -410,6 +410,29 @@ server.registerTool('update_sprint', {
   return text(`Updated sprint #${s.id} ${s.name} [${s.state}]${s.start_date ? ` ${s.start_date}` : ''}${s.end_date ? ` → ${s.end_date}` : ''}`)
 })
 
-// ponytail: no delete_issue tool — hard delete is irreversible, keep it UI-only.
+server.registerTool('delete_issue', {
+  description: 'PERMANENTLY delete an issue by key — irreversible, comments and links included; subtasks are detached, not deleted. To merely hide an issue from the board, use update_issue with archived: true instead.',
+  inputSchema: { key: keyParam },
+}, async ({ key }) => {
+  await api('DELETE', `/issues/${encodeURIComponent(key.trim())}`)
+  return text(`Deleted ${key.trim()} permanently`)
+})
+
+server.registerTool('delete_project', {
+  description: 'PERMANENTLY delete a project and EVERYTHING in it — all issues, sprints and board columns. Irreversible. As confirmation, confirm_prefix must match the project\'s issue key prefix (see list_projects).',
+  inputSchema: {
+    project_id: z.number().int().describe('Project id (integer) to delete. Use list_projects to find it.'),
+    confirm_prefix: z.string().describe('The project\'s key prefix, e.g. "YS" — must match, as a deliberate confirmation of which project dies.'),
+  },
+}, async ({ project_id, confirm_prefix }) => {
+  const projects = await api('GET', '/projects')
+  const p = projects.find(x => x.id === project_id)
+  if (!p) throw new Error(`no project with id ${project_id} (known: ${projects.map(x => `#${x.id} ${x.key_prefix}`).join(', ')})`)
+  if (p.key_prefix !== confirm_prefix.trim().toUpperCase()) {
+    throw new Error(`confirm_prefix "${confirm_prefix}" does not match project #${p.id}'s prefix "${p.key_prefix}" — refusing to delete`)
+  }
+  await api('DELETE', `/projects/${p.id}`)
+  return text(`Deleted project #${p.id} ${p.key_prefix} — ${p.name}, with all its issues, sprints and columns`)
+})
 
 await server.connect(new StdioServerTransport())

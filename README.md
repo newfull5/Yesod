@@ -49,6 +49,10 @@ docker run -d \
   ghcr.io/newfull5/yesod:v0.9.1
 ```
 
+## MCP
+
+Yesod ships an MCP server so Claude Code (or any MCP client) can manage your board — raise issues mid-session, move cards, run sprints. See [mcp/README.md](mcp/README.md).
+
 ## License
 
 MIT

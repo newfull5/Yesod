@@ -38,7 +38,8 @@ try {
   const names = tools.map((t) => t.name).sort()
   for (const want of ['add_comment', 'assign_to_me', 'create_issue', 'get_issue', 'list_issues', 'list_sprints', 'update_issue',
     'list_projects', 'create_project', 'list_statuses', 'add_column', 'delete_column', 'link_issues', 'unlink_issues',
-    'list_people', 'create_person', 'list_teams', 'create_team', 'create_sprint', 'update_sprint']) {
+    'list_people', 'create_person', 'list_teams', 'create_team', 'create_sprint', 'update_sprint',
+    'delete_issue', 'delete_project']) {
     assert(names.includes(want), `missing tool ${want}; got ${names}`)
   }
   assert(tools.every((t) => t.description.length > 20), 'every tool has a rich description')
@@ -101,6 +102,17 @@ try {
   assert((await call('list_people', {})).includes('Smoke Tester'), 'list_people includes Smoke Tester')
   await call('create_team', { name: `Smoke team ${run}` })
   assert((await call('list_teams', {})).includes(`Smoke team ${run}`), 'list_teams includes new team')
+
+  // v0.3.0 tools — hard deletes; doubles as cleanup of the smoke project.
+  const gone = await call('delete_issue', { key: otherKey })
+  assert(gone.includes('Deleted'), `delete_issue: ${gone}`)
+  const stillThere = await client.callTool({ name: 'get_issue', arguments: { key: otherKey } })
+  assert(stillThere.isError, 'deleted issue is really gone')
+  const badPrefix = await client.callTool({ name: 'delete_project', arguments: { project_id: pid, confirm_prefix: 'NOPE' } })
+  assert(badPrefix.isError, 'delete_project refuses a wrong confirm_prefix')
+  const delProj = await call('delete_project', { project_id: pid, confirm_prefix: `SM${run}` })
+  assert(delProj.includes('Deleted project'), `delete_project: ${delProj}`)
+  assert(!(await call('list_projects', {})).includes(`SM${run}`), 'smoke project really gone')
 
   console.log(`SMOKE OK (${key})`)
   process.exitCode = 0
