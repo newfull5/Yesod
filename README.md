@@ -21,7 +21,7 @@ docker run -d \
   --name yesod \
   -p 9999:9999 \
   -v "$PWD/data:/data" \
-  ghcr.io/newfull5/yesod:v0.9.1
+  ghcr.io/newfull5/yesod:v0.10.0
 ```
 
 Open `http://localhost:9999`.
@@ -46,7 +46,7 @@ docker run -d \
   -p 9999:9999 \
   -v "$PWD/data:/data" \
   -e YESOD_PASSWORD='change-me' \
-  ghcr.io/newfull5/yesod:v0.9.1
+  ghcr.io/newfull5/yesod:v0.10.0
 ```
 
 ## MCP
