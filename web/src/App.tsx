@@ -123,6 +123,8 @@ export default function App() {
 
         <span className="spacer" />
 
+        <ThemeToggle />
+
         <button className="btn primary" onClick={() => setCreating({})} disabled={projectId == null}>
           <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round">
             <path d="M8 2v12M2 8h12" />
@@ -152,7 +154,7 @@ export default function App() {
             onChange={(v) => setFilters({ ...filters, type: v ? Number(v) : null })}
           />
           <div className="search-box">
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#9B95B3" strokeWidth="1.6">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6">
               <circle cx="7" cy="7" r="5" />
               <path d="M11 11l3.5 3.5" />
             </svg>
@@ -238,6 +240,35 @@ export default function App() {
         />
       )}
     </>
+  )
+}
+
+// index.html stamps data-theme before first paint; this just flips and persists it.
+function ThemeToggle() {
+  const [theme, setTheme] = useState(document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light')
+  const next = theme === 'dark' ? 'light' : 'dark'
+  return (
+    <button
+      className="btn subtle"
+      title={`Switch to ${next} mode`}
+      aria-label={`Switch to ${next} mode`}
+      onClick={() => {
+        document.documentElement.dataset.theme = next
+        localStorage.setItem('theme', next)
+        setTheme(next)
+      }}
+    >
+      {theme === 'dark' ? (
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+          <circle cx="8" cy="8" r="3.5" />
+          <path d="M8 1v1.8M8 13.2V15M1 8h1.8M13.2 8H15M3 3l1.3 1.3M11.7 11.7 13 13M13 3l-1.3 1.3M4.3 11.7 3 13" />
+        </svg>
+      ) : (
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M13.5 9.5A6 6 0 1 1 6.5 2.5a5 5 0 0 0 7 7Z" />
+        </svg>
+      )}
+    </button>
   )
 }
 

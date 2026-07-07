@@ -5,6 +5,12 @@
     <link rel="icon" type="image/png" href="/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Yesod</title>
+    <script>
+      // Stamp the theme before first paint: stored choice wins, else OS preference.
+      document.documentElement.dataset.theme =
+        localStorage.getItem('theme') ||
+        (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+    </script>
   </head>
   <body>
     <div id="root"></div>
