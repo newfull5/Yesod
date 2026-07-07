@@ -1248,6 +1248,12 @@ section {
   margin: 0 auto;
 }
 
+.backlog-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
 .backlog-section {
   background: #fff;
   border: 1px solid var(--border-3);
