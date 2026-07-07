@@ -25,6 +25,46 @@
   --radius: 6px;
   --card: #ffffff;
   --panel: #ffffff;
+  --border-hover: #d9cdee;
+  --column-bg: #f1eef8;
+  --column-border: #e9e3f4;
+  --danger-ghost: #b33a3a;
+  --backdrop: rgba(30, 20, 55, 0.4);
+}
+
+/* Dark palette. Stamped as data-theme on <html> before first paint
+   (see index.html); defaults to the OS preference when no choice is stored. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #16141d;
+  --topbar-border: #2b2740;
+  --filter-bg: #1a1725;
+  --filter-border: #26223a;
+  --accent: #8b68d8;
+  --accent-hover: #9b7ce0;
+  --accent-active: #7a58c9;
+  --text: #e8e5f2;
+  --secondary: #c6c0da;
+  --muted: #948daf;
+  --faint: #746d90;
+  --placeholder: #5f5879;
+  --border: #2b2740;
+  --border-2: #322d4a;
+  --border-3: #2b2740;
+  --border-4: #282442;
+  --hover-bg: #2a2540;
+  --count-pill: #2c2745;
+  --drag-over-bg: #292145;
+  --drag-over-border: #5c47a0;
+  --danger: #f0655a;
+  --danger-bg: #3a2226;
+  --card: #221e31;
+  --panel: #1e1b29;
+  --border-hover: #4b3f70;
+  --column-bg: #1b1826;
+  --column-border: #26223a;
+  --danger-ghost: #e07a70;
+  --backdrop: rgba(0, 0, 0, 0.55);
 }
 
 * {
@@ -51,7 +91,7 @@ textarea {
 input,
 select,
 textarea {
-  background: #fff;
+  background: var(--panel);
   border: 1px solid var(--border-2);
   border-radius: var(--radius);
   padding: 7px 9px;
@@ -93,7 +133,7 @@ section {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  background: #fff;
+  background: var(--panel);
   border: 1px solid var(--border-2);
   border-radius: var(--radius);
   padding: 7px 13px;
@@ -106,7 +146,7 @@ section {
 
 .btn:hover {
   background: var(--hover-bg);
-  border-color: #d9cdee;
+  border-color: var(--border-hover);
 }
 
 .btn:active:not(:disabled) {
@@ -152,7 +192,7 @@ section {
 .btn.danger-ghost {
   background: none;
   border: none;
-  color: #b33a3a;
+  color: var(--danger-ghost);
   padding: 5px 9px;
 }
 
@@ -233,7 +273,7 @@ section {
   align-items: center;
   gap: 22px;
   padding: 12px 24px;
-  background: #fff;
+  background: var(--panel);
   border-bottom: 1px solid var(--topbar-border);
   box-shadow: inset 0 -3px 0 var(--accent);
   position: sticky;
@@ -327,6 +367,7 @@ section {
 }
 
 .search-box svg {
+  color: var(--faint);
   position: absolute;
   left: 10px;
   top: 50%;
@@ -395,7 +436,7 @@ section {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #fff;
+  background: var(--panel);
   border: 1px solid var(--drag-over-border);
   color: var(--accent);
   font-size: 13px;
@@ -410,8 +451,8 @@ section {
 }
 
 .column {
-  background: #f1eef8;
-  border: 1px solid #e9e3f4;
+  background: var(--column-bg);
+  border: 1px solid var(--column-border);
   border-radius: 10px;
   flex: 1 1 300px;
   min-width: 280px;
@@ -532,7 +573,7 @@ section {
 }
 
 .card {
-  background: #fff;
+  background: var(--panel);
   border: 1px solid var(--border-3);
   border-left: 3px solid var(--border-3);
   border-radius: var(--radius);
@@ -543,7 +584,7 @@ section {
 }
 
 .card:hover {
-  border-color: #d9cdee;
+  border-color: var(--border-hover);
   border-left-color: var(--accent);
   box-shadow: 0 4px 14px rgba(103, 65, 183, 0.1);
   transform: translateY(-1px);
@@ -662,7 +703,7 @@ section {
 }
 
 .cat-pick:hover {
-  border-color: #d9cdee;
+  border-color: var(--border-hover);
 }
 
 .cat-pick.active {
@@ -676,7 +717,7 @@ section {
 .backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(30, 20, 55, 0.4);
+  background: var(--backdrop);
   display: flex;
   align-items: flex-start;
   justify-content: center;
@@ -707,7 +748,7 @@ section {
 }
 
 .dialog {
-  background: #fff;
+  background: var(--panel);
   border: none;
   border-radius: 10px;
   padding: 0;
@@ -788,7 +829,7 @@ section {
 }
 
 .modal {
-  background: #fff;
+  background: var(--panel);
   border: none;
   border-radius: 10px;
   width: 980px;
@@ -912,7 +953,7 @@ section {
   border: 1px solid var(--border-3);
   border-radius: var(--radius);
   margin-bottom: 6px;
-  background: #fff;
+  background: var(--panel);
 }
 
 .row-title {
@@ -1109,7 +1150,7 @@ section {
   display: block;
   width: 100%;
   text-align: left;
-  background: #fff;
+  background: var(--panel);
   border: none;
   border-bottom: 1px solid var(--border-3);
   padding: 6px 8px;
@@ -1150,7 +1191,7 @@ section {
 
 .dropdown-trigger:hover {
   background: var(--hover-bg);
-  border-color: #d9cdee;
+  border-color: var(--border-hover);
 }
 
 .dropdown-value {
@@ -1180,7 +1221,7 @@ section {
   max-width: 320px;
   max-height: 480px;
   overflow-y: auto;
-  background: #fff;
+  background: var(--panel);
   border-radius: 8px;
   box-shadow: 0 8px 24px rgba(30, 20, 60, 0.12);
   padding: 4px;
@@ -1249,7 +1290,7 @@ section {
 }
 
 .backlog-section {
-  background: #fff;
+  background: var(--panel);
   border: 1px solid var(--border-3);
   border-radius: var(--radius);
   padding: 12px 14px;
@@ -1290,13 +1331,13 @@ section {
   border: 1px solid var(--border-3);
   border-radius: var(--radius);
   margin-bottom: 6px;
-  background: #fff;
+  background: var(--panel);
   cursor: grab;
   transition: border-color 0.12s ease, box-shadow 0.12s ease;
 }
 
 .backlog-row:hover {
-  border-color: #d9cdee;
+  border-color: var(--border-hover);
   box-shadow: 0 2px 8px rgba(103, 65, 183, 0.08);
 }
 
@@ -1369,7 +1410,7 @@ section {
 }
 
 .login-card {
-  background: #fff;
+  background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 28px;
