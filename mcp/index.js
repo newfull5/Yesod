@@ -333,6 +333,18 @@ server.registerTool('delete_column', {
   return text(`Deleted column "${name}"${moved ? ` — moved ${moved} issue(s) to ${move_to}` : ''}`)
 })
 
+server.registerTool('archive_column', {
+  description: 'Archive every issue in a done-category column (same as the board\'s "Clear" button): the cards leave the board but stay in the database, visible in Backlog → Archive. Only done columns can be cleared. Returns the number of issues archived.',
+  inputSchema: {
+    project_id: projectParam,
+    status: z.string().min(1).describe('Column (status) NAME to clear, case-insensitive, e.g. "Done". Must be a done-category column.'),
+  },
+}, async ({ project_id = 1, status }) => {
+  const id = await resolveStatus(status, project_id)
+  const res = await api('POST', `/statuses/${id}/clear`)
+  return text(`Archived ${res.archived} issue(s) from "${status}" in project ${project_id}`)
+})
+
 server.registerTool('list_people', {
   description: 'List all people (usable as assignee/reporter/comment author names).',
   inputSchema: {},

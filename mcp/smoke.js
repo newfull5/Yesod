@@ -39,7 +39,7 @@ try {
   for (const want of ['add_comment', 'assign_to_me', 'create_issue', 'get_issue', 'list_issues', 'list_sprints', 'update_issue',
     'list_projects', 'create_project', 'list_statuses', 'add_column', 'delete_column', 'link_issues', 'unlink_issues',
     'list_people', 'create_person', 'list_teams', 'create_team', 'create_sprint', 'update_sprint',
-    'delete_issue', 'delete_project']) {
+    'delete_issue', 'delete_project', 'archive_column']) {
     assert(names.includes(want), `missing tool ${want}; got ${names}`)
   }
   assert(tools.every((t) => t.description.length > 20), 'every tool has a rich description')
@@ -102,6 +102,14 @@ try {
   assert((await call('list_people', {})).includes('Smoke Tester'), 'list_people includes Smoke Tester')
   await call('create_team', { name: `Smoke team ${run}` })
   assert((await call('list_teams', {})).includes(`Smoke team ${run}`), 'list_teams includes new team')
+
+  // archive_column — bulk-archive the smoke project's Done column.
+  const doneIssue = await call('create_issue', { project_id: pid, title: 'Smoke archive target', status: 'Done' })
+  assert(doneIssue.includes('[Done]'), `issue in Done: ${doneIssue}`)
+  const cleared = await call('archive_column', { project_id: pid, status: 'Done' })
+  assert(cleared.includes('Archived 1 issue'), `archive_column: ${cleared}`)
+  const notDone = await client.callTool({ name: 'archive_column', arguments: { project_id: pid, status: 'To Do' } })
+  assert(notDone.isError, 'archive_column refuses a non-done column')
 
   // v0.3.0 tools — hard deletes; doubles as cleanup of the smoke project.
   const gone = await call('delete_issue', { key: otherKey })
