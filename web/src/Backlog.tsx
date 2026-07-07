@@ -10,11 +10,13 @@ type Props = {
   sprints: Sprint[]
   version: number
   onOpen: (key: string) => void
+  onChanged: () => void
 }
 
-export default function Backlog({ projectId, sprints, version, onOpen }: Props) {
+export default function Backlog({ projectId, sprints, version, onOpen, onChanged }: Props) {
   const [issues, setIssues] = useState<Card[] | null>(null)
   const [error, setError] = useState('')
+  const [creatingSprint, setCreatingSprint] = useState(false)
   const justDragged = useRef(false)
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
@@ -74,6 +76,11 @@ export default function Backlog({ projectId, sprints, version, onOpen }: Props) 
 
   return (
     <div className="backlog">
+      <div className="backlog-toolbar">
+        <button className="btn" onClick={() => setCreatingSprint(true)}>
+          + New sprint
+        </button>
+      </div>
       {error && (
         <div className="banner error" onClick={() => setError('')}>
           {error} (click to dismiss)
@@ -96,6 +103,72 @@ export default function Backlog({ projectId, sprints, version, onOpen }: Props) 
         <Section droppableId="backlog" title="Backlog" subtitle="" rows={unassigned} from={null} onOpen={open} />
       </DndContext>
       {archived.length > 0 && <ArchiveSection rows={archived} onOpen={open} />}
+      {creatingSprint && (
+        <NewSprint
+          projectId={projectId}
+          onClose={() => setCreatingSprint(false)}
+          onCreated={() => {
+            setCreatingSprint(false)
+            onChanged()
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+function NewSprint({ projectId, onClose, onCreated }: { projectId: number; onClose: () => void; onCreated: () => void }) {
+  const [name, setName] = useState('')
+  const [start, setStart] = useState('')
+  const [end, setEnd] = useState('')
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
+  return (
+    <div className="backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <form
+        className="dialog"
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (!name.trim() || busy) return
+          setBusy(true)
+          const body: Record<string, unknown> = { project_id: projectId, name: name.trim() }
+          if (start) body.start_date = start
+          if (end) body.end_date = end
+          api<Sprint>('/sprints', 'POST', body)
+            .then(onCreated)
+            .catch((er: Error) => {
+              setErr(er.message)
+              setBusy(false)
+            })
+        }}
+      >
+        <div className="dialog-head">
+          <h2>New sprint</h2>
+        </div>
+        <div className="dialog-body">
+          <div className="field">
+            <div className="field-label">Name</div>
+            <input placeholder="e.g. Sprint 3" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+          </div>
+          <div className="field">
+            <div className="field-label">Start date</div>
+            <input type="date" value={start} onChange={(e) => setStart(e.target.value)} />
+          </div>
+          <div className="field">
+            <div className="field-label">End date</div>
+            <input type="date" value={end} onChange={(e) => setEnd(e.target.value)} />
+          </div>
+        </div>
+        {err && <p className="error dialog-error">{err}</p>}
+        <div className="dialog-actions">
+          <button type="button" className="btn" onClick={onClose}>
+            Cancel
+          </button>
+          <button type="submit" className="btn primary" disabled={!name.trim() || busy}>
+            Create
+          </button>
+        </div>
+      </form>
     </div>
   )
 }

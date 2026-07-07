@@ -177,7 +177,7 @@ export default function App() {
           />
         )}
         {projectId != null && view === 'backlog' && (
-          <Backlog projectId={projectId} sprints={sprints} version={version} onOpen={setModalKey} />
+          <Backlog projectId={projectId} sprints={sprints} version={version} onOpen={setModalKey} onChanged={bump} />
         )}
       </main>
 
