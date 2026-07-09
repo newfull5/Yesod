@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api, setUnauthorizedHandler, ISSUE_TYPES } from './api'
 import type { Detail, Person, Project, Sprint, Status, Team } from './api'
 import Board from './Board'
-import Backlog from './Backlog'
+import Backlog, { NewSprint } from './Backlog'
 import IssueModal from './IssueModal'
 import { Dropdown, TypeIcon } from './ui'
 
@@ -25,6 +25,7 @@ export default function App() {
   const [modalKey, setModalKey] = useState<string | null>(null)
   const [creating, setCreating] = useState<{ statusId?: number } | null>(null)
   const [newProject, setNewProject] = useState(false)
+  const [creatingSprint, setCreatingSprint] = useState(false)
   const [deletingProject, setDeletingProject] = useState<Project | null>(null)
   const [version, setVersion] = useState(0)
   const bump = useCallback(() => setVersion((v) => v + 1), [])
@@ -141,6 +142,9 @@ export default function App() {
             options={[{ value: '', label: 'All sprints' }, ...sprints.map((s) => ({ value: String(s.id), label: s.name }))]}
             onChange={(v) => setFilters({ ...filters, sprint: v ? Number(v) : null })}
           />
+          <button className="btn" onClick={() => setCreatingSprint(true)} disabled={projectId == null}>
+            + New sprint
+          </button>
           <Dropdown
             value={filters.assignee != null ? String(filters.assignee) : ''}
             placeholder="All assignees"
@@ -195,6 +199,17 @@ export default function App() {
               setProjectId(remaining[0]?.id ?? null)
               setFilters(NO_FILTERS)
             }
+          }}
+        />
+      )}
+
+      {creatingSprint && projectId != null && (
+        <NewSprint
+          projectId={projectId}
+          onClose={() => setCreatingSprint(false)}
+          onCreated={() => {
+            setCreatingSprint(false)
+            bump()
           }}
         />
       )}
