@@ -117,7 +117,7 @@ export default function Backlog({ projectId, sprints, version, onOpen, onChanged
   )
 }
 
-function NewSprint({ projectId, onClose, onCreated }: { projectId: number; onClose: () => void; onCreated: () => void }) {
+export function NewSprint({ projectId, onClose, onCreated }: { projectId: number; onClose: () => void; onCreated: () => void }) {
   const [name, setName] = useState('')
   const [start, setStart] = useState('')
   const [end, setEnd] = useState('')
@@ -152,11 +152,11 @@ function NewSprint({ projectId, onClose, onCreated }: { projectId: number; onClo
           </div>
           <div className="field">
             <div className="field-label">Start date</div>
-            <input type="date" value={start} onChange={(e) => setStart(e.target.value)} />
+            <input lang="en" type="date" value={start} onChange={(e) => setStart(e.target.value)} />
           </div>
           <div className="field">
             <div className="field-label">End date</div>
-            <input type="date" value={end} onChange={(e) => setEnd(e.target.value)} />
+            <input lang="en" type="date" value={end} onChange={(e) => setEnd(e.target.value)} />
           </div>
         </div>
         {err && <p className="error dialog-error">{err}</p>}

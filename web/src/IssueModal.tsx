@@ -180,6 +180,7 @@ export default function IssueModal({
                   <Field label="Start date" icon={IconCalendar}>
                     <input
                       type="date"
+                      lang="en"
                       value={issue.start_date ?? ''}
                       onChange={(e) => patch({ start_date: e.target.value || null })}
                     />
@@ -187,6 +188,7 @@ export default function IssueModal({
                   <Field label="Due date" icon={IconCalendar}>
                     <input
                       type="date"
+                      lang="en"
                       value={issue.due_date ?? ''}
                       onChange={(e) => patch({ due_date: e.target.value || null })}
                     />
