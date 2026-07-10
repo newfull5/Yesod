@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { api, LINK_TYPES } from './api'
+import { NewSprint } from './Backlog'
 import type { Card, Detail, Person, Sprint, Status, Team } from './api'
 import {
   Avatar,
@@ -40,6 +41,7 @@ export default function IssueModal({
   const [k, setK] = useState(issueKey)
   const [issue, setIssue] = useState<Detail | null>(null)
   const [err, setErr] = useState('')
+  const [creatingSprint, setCreatingSprint] = useState(false)
 
   const load = useCallback(
     () =>
@@ -157,7 +159,14 @@ export default function IssueModal({
                   />
                 </Field>
                 <Field label="Sprints" icon={IconSprint}>
-                  {sprints.length === 0 && <span className="muted">No sprints</span>}
+                  {sprints.length === 0 && (
+                    <span className="muted">
+                      No sprints —{' '}
+                      <button type="button" className="link-btn" onClick={() => setCreatingSprint(true)}>
+                        create one
+                      </button>
+                    </span>
+                  )}
                   {sprints.map((s) => (
                     <label key={s.id} className="check">
                       <input
@@ -217,6 +226,16 @@ export default function IssueModal({
           </>
         )}
       </div>
+      {creatingSprint && (
+        <NewSprint
+          projectId={projectId}
+          onClose={() => setCreatingSprint(false)}
+          onCreated={() => {
+            setCreatingSprint(false)
+            onChanged()
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -500,7 +519,9 @@ function Activity({
             <strong>{c.author?.name ?? 'Anonymous'}</strong>
             <span className="muted">{c.created_at} UTC</span>
           </div>
-          <div className="comment-body">{c.body}</div>
+          <div className="comment-body">
+            <ReactMarkdown>{c.body}</ReactMarkdown>
+          </div>
         </div>
       ))}
       <form

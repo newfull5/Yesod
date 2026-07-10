@@ -1013,10 +1013,40 @@ section {
   margin-bottom: 2px;
 }
 
+.link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
 .comment-body {
-  white-space: pre-wrap;
   line-height: 1.45;
   font-size: 13.5px;
+}
+
+.comment-body p {
+  margin: 0 0 6px;
+}
+
+.comment-body p:last-child {
+  margin-bottom: 0;
+}
+
+.comment-body pre {
+  background: var(--bg);
+  padding: 10px;
+  border-radius: var(--radius);
+  overflow-x: auto;
+}
+
+.comment-body code {
+  background: var(--bg);
+  padding: 1px 4px;
+  border-radius: 4px;
 }
 
 .comment-add {
