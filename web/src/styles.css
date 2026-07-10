@@ -864,13 +864,18 @@ section {
 
 .modal-body {
   display: grid;
-  grid-template-columns: 1fr 260px;
+  grid-template-columns: minmax(0, 1fr) 260px;
   gap: 28px;
+}
+
+.modal-main,
+.modal-side {
+  min-width: 0;
 }
 
 @media (max-width: 760px) {
   .modal-body {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -1057,6 +1062,12 @@ section {
 .field-row input[type='date'] {
   width: 100%;
   min-width: 0;
+}
+
+@media (max-width: 480px) {
+  .field-row {
+    flex-direction: column;
+  }
 }
 
 .field {
