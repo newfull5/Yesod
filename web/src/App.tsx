@@ -14,7 +14,10 @@ export default function App() {
   const [needLogin, setNeedLogin] = useState(false)
   const [fatal, setFatal] = useState('')
   const [projects, setProjects] = useState<Project[] | null>(null)
-  const [projectId, setProjectId] = useState<number | null>(null)
+  const [projectId, setProjectId] = useState<number | null>(() => {
+    const saved = Number(localStorage.getItem('yesod.projectId'))
+    return Number.isInteger(saved) && saved > 0 ? saved : null
+  })
   const [people, setPeople] = useState<Person[]>([])
   const [teams, setTeams] = useState<Team[]>([])
   const [sprints, setSprints] = useState<Sprint[]>([])
@@ -57,6 +60,10 @@ export default function App() {
     api<Sprint[]>(`/sprints?project_id=${projectId}`).then(setSprints).catch(() => {})
     api<Status[]>(`/statuses?project_id=${projectId}`).then(setStatuses).catch(() => {})
   }, [needLogin, projectId, version])
+
+  useEffect(() => {
+    if (projectId != null) localStorage.setItem('yesod.projectId', String(projectId))
+  }, [projectId])
 
   if (needLogin) {
     return (
