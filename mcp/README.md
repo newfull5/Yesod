@@ -47,7 +47,7 @@ Restart Claude Code and the tools show up as `mcp__yesod__*`. For other MCP clie
 | Area | Tools |
 |---|---|
 | Projects | `list_projects`, `create_project`, `delete_project` |
-| Issues | `list_issues`, `get_issue`, `create_issue`, `update_issue`, `delete_issue`, `assign_to_me`, `add_comment` |
+| Issues | `list_issues`, `get_issue`, `create_issue`, `update_issue`, `delete_issue`, `assign_to_me`, `add_comment`, `update_comment`, `delete_comment` |
 | Links | `link_issues`, `unlink_issues` |
 | Board columns | `list_statuses`, `add_column`, `delete_column`, `archive_column` |
 | People / Teams | `list_people`, `create_person`, `list_teams`, `create_team` |

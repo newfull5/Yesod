@@ -36,7 +36,7 @@ try {
 
   const { tools } = await client.listTools()
   const names = tools.map((t) => t.name).sort()
-  for (const want of ['add_comment', 'assign_to_me', 'create_issue', 'get_issue', 'list_issues', 'list_sprints', 'update_issue',
+  for (const want of ['add_comment', 'update_comment', 'delete_comment', 'assign_to_me', 'create_issue', 'get_issue', 'list_issues', 'list_sprints', 'update_issue',
     'list_projects', 'create_project', 'list_statuses', 'add_column', 'delete_column', 'link_issues', 'unlink_issues',
     'list_people', 'create_person', 'list_teams', 'create_team', 'create_sprint', 'update_sprint',
     'delete_issue', 'delete_project', 'archive_column']) {
@@ -65,6 +65,22 @@ try {
 
   const got = await call('get_issue', { key })
   assert(got.includes('[In Progress]') && got.includes('smoke comment'), `detail output: ${got}`)
+
+  const commentsRes = await fetch(`${BASE}/api/issues/${key}/comments`)
+  const comments = await commentsRes.json()
+  const commentId = comments.find((c) => c.body === 'smoke comment').id
+
+  const editedComment = await call('update_comment', { key, comment_id: commentId, body: 'smoke comment edited' })
+  assert(editedComment.includes('smoke comment edited'), `update_comment output: ${editedComment}`)
+
+  const gotEdited = await call('get_issue', { key })
+  assert(gotEdited.includes('smoke comment edited'), `detail after edit: ${gotEdited}`)
+
+  const deletedComment = await call('delete_comment', { key, comment_id: commentId })
+  assert(deletedComment.includes(String(commentId)), `delete_comment output: ${deletedComment}`)
+
+  const gotDeleted = await call('get_issue', { key })
+  assert(!gotDeleted.includes('smoke comment edited'), `detail after delete: ${gotDeleted}`)
 
   const sprints = await call('list_sprints', {})
   assert(typeof sprints === 'string' && sprints.length > 0, 'list_sprints returns text')

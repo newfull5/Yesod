@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { api, LINK_TYPES } from './api'
 import { NewSprint } from './Backlog'
-import type { Card, Detail, Person, Sprint, Status, Team } from './api'
+import type { Card, Comment as CommentType, Detail, Person, Sprint, Status, Team } from './api'
 import {
   Avatar,
   Dropdown,
@@ -496,6 +496,74 @@ function Links({
   )
 }
 
+function Comment({ c, k, onChanged }: { c: CommentType; k: string; onChanged: () => void }) {
+  const [editing, setEditing] = useState(false)
+  const [body, setBody] = useState(c.body)
+  const [busy, setBusy] = useState(false)
+
+  if (editing) {
+    return (
+      <div className="comment">
+        <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={2} autoFocus />
+        <div className="comment-edit-actions">
+          <button
+            type="button"
+            className="btn primary"
+            disabled={!body.trim() || busy}
+            onClick={() => {
+              const b = body.trim()
+              if (!b || busy) return
+              setBusy(true)
+              api(`/issues/${k}/comments/${c.id}`, 'PATCH', { body: b })
+                .then(() => {
+                  setEditing(false)
+                  onChanged()
+                })
+                .finally(() => setBusy(false))
+            }}
+          >
+            Save
+          </button>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => {
+              setBody(c.body)
+              setEditing(false)
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="comment">
+      <div className="comment-head">
+        <strong>{c.author?.name ?? 'Anonymous'}</strong>
+        <span className="muted">{c.created_at} UTC</span>
+        <span className="comment-actions">
+          <button type="button" className="comment-action" onClick={() => setEditing(true)}>
+            Edit
+          </button>
+          <button
+            type="button"
+            className="comment-action"
+            onClick={() => api(`/issues/${k}/comments/${c.id}`, 'DELETE').then(onChanged)}
+          >
+            Delete
+          </button>
+        </span>
+      </div>
+      <div className="comment-body">
+        <ReactMarkdown>{c.body}</ReactMarkdown>
+      </div>
+    </div>
+  )
+}
+
 function Activity({
   issue,
   k,
@@ -514,15 +582,7 @@ function Activity({
     <section>
       <h3>Activity</h3>
       {issue.comments.map((c) => (
-        <div className="comment" key={c.id}>
-          <div className="comment-head">
-            <strong>{c.author?.name ?? 'Anonymous'}</strong>
-            <span className="muted">{c.created_at} UTC</span>
-          </div>
-          <div className="comment-body">
-            <ReactMarkdown>{c.body}</ReactMarkdown>
-          </div>
-        </div>
+        <Comment key={c.id} c={c} k={k} onChanged={onChanged} />
       ))}
       <form
         className="comment-add"

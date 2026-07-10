@@ -274,6 +274,29 @@ server.registerTool('add_comment', {
   return text(`Comment added to ${key.trim()} by ${c.author ? c.author.name : 'anonymous'} at ${c.created_at}: ${c.body}`)
 })
 
+server.registerTool('update_comment', {
+  description: 'Edit the body of an existing comment on an issue.',
+  inputSchema: {
+    key: keyParam,
+    comment_id: z.number().int().describe('ID of the comment to update.'),
+    body: z.string().min(1).describe('New comment text (required, non-empty).'),
+  },
+}, async ({ key, comment_id, body }) => {
+  const c = await api('PATCH', `/issues/${encodeURIComponent(key.trim())}/comments/${comment_id}`, { body })
+  return text(`Comment ${comment_id} on ${key.trim()} updated: ${c.body}`)
+})
+
+server.registerTool('delete_comment', {
+  description: 'Delete a comment from an issue.',
+  inputSchema: {
+    key: keyParam,
+    comment_id: z.number().int().describe('ID of the comment to delete.'),
+  },
+}, async ({ key, comment_id }) => {
+  await api('DELETE', `/issues/${encodeURIComponent(key.trim())}/comments/${comment_id}`)
+  return text(`Comment ${comment_id} deleted from ${key.trim()}.`)
+})
+
 server.registerTool('link_issues', {
   description: 'Link two issues. link_type is directional from the first issue: "YS-1 blocks YS-2" means YS-2 cannot proceed until YS-1 is done.',
   inputSchema: {

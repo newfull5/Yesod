@@ -1012,3 +1012,69 @@ func (s *server) addComment(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusCreated, c)
 }
+
+func (s *server) updateComment(w http.ResponseWriter, r *http.Request) {
+	issueID, _, _, ok := s.issueByKey(w, r.PathValue("key"))
+	if !ok {
+		return
+	}
+	commentID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "invalid comment id")
+		return
+	}
+	var req struct {
+		Body string `json:"body"`
+	}
+	if !decode(w, r, &req) {
+		return
+	}
+	if strings.TrimSpace(req.Body) == "" {
+		writeErr(w, http.StatusBadRequest, "body is required")
+		return
+	}
+	res, err := s.db.Exec(`UPDATE comments SET body = ? WHERE id = ? AND issue_id = ?`, req.Body, commentID, issueID)
+	if err != nil {
+		dbErr(w, err)
+		return
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		writeErr(w, http.StatusNotFound, "comment not found")
+		return
+	}
+	var c comment
+	var authorID sql.NullInt64
+	var authorName sql.NullString
+	if err := s.db.QueryRow(`SELECT c.id, c.author_id, p.name, c.body, c.created_at
+		FROM comments c LEFT JOIN people p ON p.id = c.author_id WHERE c.id = ?`, commentID).Scan(
+		&c.ID, &authorID, &authorName, &c.Body, &c.CreatedAt); err != nil {
+		dbErr(w, err)
+		return
+	}
+	if authorID.Valid {
+		c.Author = &ref{authorID.Int64, authorName.String}
+	}
+	writeJSON(w, http.StatusOK, c)
+}
+
+func (s *server) deleteComment(w http.ResponseWriter, r *http.Request) {
+	issueID, _, _, ok := s.issueByKey(w, r.PathValue("key"))
+	if !ok {
+		return
+	}
+	commentID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "invalid comment id")
+		return
+	}
+	res, err := s.db.Exec(`DELETE FROM comments WHERE id = ? AND issue_id = ?`, commentID, issueID)
+	if err != nil {
+		dbErr(w, err)
+		return
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		writeErr(w, http.StatusNotFound, "comment not found")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}

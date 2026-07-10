@@ -49,6 +49,8 @@ func RegisterRoutes(mux *http.ServeMux, d *sql.DB) {
 	api.HandleFunc("DELETE /api/issues/{key}/links", s.deleteLink)
 	api.HandleFunc("GET /api/issues/{key}/comments", s.listComments)
 	api.HandleFunc("POST /api/issues/{key}/comments", s.addComment)
+	api.HandleFunc("PATCH /api/issues/{key}/comments/{id}", s.updateComment)
+	api.HandleFunc("DELETE /api/issues/{key}/comments/{id}", s.deleteComment)
 
 	api.HandleFunc("GET /api/sprints", s.listSprints)
 	api.HandleFunc("POST /api/sprints", s.createSprint)

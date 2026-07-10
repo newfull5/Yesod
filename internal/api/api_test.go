@@ -411,6 +411,28 @@ func TestComments(t *testing.T) {
 	if list[1]["author"] != nil {
 		t.Errorf("anonymous comment author = %v, want null", list[1]["author"])
 	}
+
+	id := int64(list[0]["id"].(float64))
+
+	rec = do(t, h, "PATCH", fmt.Sprintf("/api/issues/YS-1/comments/%d", id), map[string]any{"body": "edited"})
+	wantStatus(t, rec, http.StatusOK)
+	c = parse[map[string]any](t, rec)
+	if c["body"] != "edited" {
+		t.Errorf("edited comment body = %v, want edited", c["body"])
+	}
+
+	wantStatus(t, do(t, h, "PATCH", fmt.Sprintf("/api/issues/YS-1/comments/%d", id), map[string]any{"body": " "}), http.StatusBadRequest)
+	wantStatus(t, do(t, h, "PATCH", "/api/issues/YS-1/comments/999", map[string]any{"body": "x"}), http.StatusNotFound)
+	wantStatus(t, do(t, h, "PATCH", "/api/issues/YS-99/comments/1", map[string]any{"body": "x"}), http.StatusNotFound)
+
+	wantStatus(t, do(t, h, "DELETE", "/api/issues/YS-1/comments/999", nil), http.StatusNotFound)
+	wantStatus(t, do(t, h, "DELETE", fmt.Sprintf("/api/issues/YS-1/comments/%d", id), nil), http.StatusNoContent)
+
+	rec = do(t, h, "GET", "/api/issues/YS-1/comments", nil)
+	list = parse[[]map[string]any](t, rec)
+	if len(list) != 1 {
+		t.Fatalf("comments after delete = %d, want 1", len(list))
+	}
 }
 
 // Regression test for the board_order race: concurrent position/status
