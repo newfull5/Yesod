@@ -3,12 +3,17 @@ import { api, setUnauthorizedHandler, ISSUE_TYPES } from './api'
 import type { Detail, Person, Project, Sprint, Status, Team } from './api'
 import Board from './Board'
 import Backlog, { NewSprint } from './Backlog'
+import AgentJobs from './AgentJobs'
 import IssueModal from './IssueModal'
 import { Dropdown, TypeIcon } from './ui'
 
 export type Filters = { sprint: number | null; assignee: number | null; type: number | null; q: string }
 
 const NO_FILTERS: Filters = { sprint: null, assignee: null, type: null, q: '' }
+
+function viewFromHash(): 'board' | 'backlog' | 'agents' {
+  return location.hash === '#backlog' ? 'backlog' : location.hash === '#agents' ? 'agents' : 'board'
+}
 
 export default function App() {
   const [needLogin, setNeedLogin] = useState(false)
@@ -24,7 +29,7 @@ export default function App() {
   const [statuses, setStatuses] = useState<Status[]>([])
   const [me, setMe] = useState<Person | null>(null)
   const [filters, setFilters] = useState<Filters>(NO_FILTERS)
-  const [view, setView] = useState<'board' | 'backlog'>(location.hash === '#backlog' ? 'backlog' : 'board')
+  const [view, setView] = useState<'board' | 'backlog' | 'agents'>(viewFromHash())
   const [modalKey, setModalKey] = useState<string | null>(null)
   const [creating, setCreating] = useState<{ statusId?: number } | null>(null)
   const [newProject, setNewProject] = useState(false)
@@ -35,7 +40,7 @@ export default function App() {
 
   useEffect(() => {
     setUnauthorizedHandler(() => setNeedLogin(true))
-    const onHash = () => setView(location.hash === '#backlog' ? 'backlog' : 'board')
+    const onHash = () => setView(viewFromHash())
     window.addEventListener('hashchange', onHash)
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
@@ -127,6 +132,9 @@ export default function App() {
           <a href="#backlog" className={view === 'backlog' ? 'active' : ''}>
             Backlog
           </a>
+          <a href="#agents" className={view === 'agents' ? 'active' : ''}>
+            Agents
+          </a>
         </nav>
 
         <span className="spacer" />
@@ -192,6 +200,7 @@ export default function App() {
         {projectId != null && view === 'backlog' && (
           <Backlog projectId={projectId} sprints={sprints} version={version} onOpen={setModalKey} onChanged={bump} />
         )}
+        {view === 'agents' && <AgentJobs onOpen={setModalKey} />}
       </main>
 
       {deletingProject && (
