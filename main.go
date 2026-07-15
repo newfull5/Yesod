@@ -19,6 +19,10 @@ import (
 var webDist embed.FS
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "runner" {
+		runRunner(os.Args[2:])
+		return
+	}
 	addr := envOr("YESOD_ADDR", ":9999")
 	dbPath := envOr("YESOD_DB", "./data/yesod.db")
 
