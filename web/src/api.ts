@@ -42,6 +42,17 @@ export type Comment = {
   created_at: string
 }
 
+export type AgentJob = {
+  id: number
+  issue_id: number
+  issue_key: string
+  status: 'queued' | 'running' | 'done' | 'failed'
+  result: string | null
+  requested_by: string | null
+  created_at: string
+  updated_at: string
+}
+
 export type Detail = Card & {
   description: string | null
   reporter: Person | null
@@ -51,6 +62,7 @@ export type Detail = Card & {
   subtasks: { key: string; title: string; status: StatusRef }[]
   links: Record<string, { key: string; title: string }[]>
   comments: Comment[]
+  agent_job: AgentJob | null
 }
 
 // ponytail: no /api/issue_types endpoint; seed types are fixed on the server.

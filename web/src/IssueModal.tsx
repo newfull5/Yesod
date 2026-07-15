@@ -129,6 +129,7 @@ export default function IssueModal({
                   onChanged={() => (void load(), onChanged())}
                 />
                 <Links issue={issue} k={k} onOpen={setK} onChanged={() => void load()} />
+                <Agent issue={issue} k={k} me={me} onChanged={() => void load()} />
                 <Activity issue={issue} k={k} me={me} onChanged={() => void load()} />
               </div>
               <aside className="modal-side">
@@ -561,6 +562,51 @@ function Comment({ c, k, onChanged }: { c: CommentType; k: string; onChanged: ()
         <ReactMarkdown>{c.body}</ReactMarkdown>
       </div>
     </div>
+  )
+}
+
+function Agent({
+  issue,
+  k,
+  me,
+  onChanged,
+}: {
+  issue: Detail
+  k: string
+  me: Person | null
+  onChanged: () => void
+}) {
+  const [err, setErr] = useState('')
+  const job = issue.agent_job
+  const active = job != null && (job.status === 'queued' || job.status === 'running')
+  useEffect(() => {
+    if (!active) return
+    const t = setInterval(onChanged, 5000) // ponytail: poll while a job is active; push/SSE if it ever matters
+    return () => clearInterval(t)
+  }, [active, onChanged])
+  return (
+    <section>
+      <h3>Agent</h3>
+      <div className="agent-row">
+        {job && <span className={`agent-chip ${job.status}`}>{job.status}</span>}
+        {job?.result && <span className="muted">{job.result}</span>}
+        <button
+          className="btn"
+          disabled={active}
+          onClick={() =>
+            api(`/issues/${k}/agent`, 'POST', me ? { requested_by: me.name } : {})
+              .then(() => {
+                setErr('')
+                onChanged()
+              })
+              .catch((e: Error) => setErr(e.message))
+          }
+        >
+          {active ? 'Working…' : 'Start work'}
+        </button>
+      </div>
+      {err && <p className="error">{err}</p>}
+    </section>
   )
 }
 

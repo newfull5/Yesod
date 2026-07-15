@@ -1501,6 +1501,31 @@ section {
   margin-left: 8px;
 }
 
+.agent-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.agent-chip {
+  background: var(--count-pill);
+  color: var(--muted);
+  border-radius: 20px;
+  padding: 2px 9px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.agent-chip.running {
+  color: var(--accent);
+}
+
+.agent-chip.failed {
+  color: var(--danger);
+}
+
 /* ---- login ---- */
 
 .login-wrap {

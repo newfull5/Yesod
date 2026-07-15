@@ -81,3 +81,13 @@ CREATE TABLE comments (
     body       TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE agent_jobs (
+    id           INTEGER PRIMARY KEY,
+    issue_id     INTEGER NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+    status       TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued','running','done','failed')),
+    result       TEXT,                            -- short outcome note from the runner
+    requested_by TEXT,                            -- person name; runners filter on it in multi-user setups
+    created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);

@@ -52,6 +52,10 @@ func RegisterRoutes(mux *http.ServeMux, d *sql.DB) {
 	api.HandleFunc("PATCH /api/issues/{key}/comments/{id}", s.updateComment)
 	api.HandleFunc("DELETE /api/issues/{key}/comments/{id}", s.deleteComment)
 
+	api.HandleFunc("POST /api/issues/{key}/agent", s.startAgent)
+	api.HandleFunc("GET /api/agent/jobs", s.listAgentJobs)
+	api.HandleFunc("PATCH /api/agent/jobs/{id}", s.patchAgentJob)
+
 	api.HandleFunc("GET /api/sprints", s.listSprints)
 	api.HandleFunc("POST /api/sprints", s.createSprint)
 	api.HandleFunc("PATCH /api/sprints/{id}", s.patchSprint)

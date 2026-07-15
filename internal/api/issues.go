@@ -92,6 +92,7 @@ type issueDetail struct {
 	Subtasks    []subtask               `json:"subtasks"`
 	Links       map[string][]linkTarget `json:"links"`
 	Comments    []comment               `json:"comments"`
+	AgentJob    *agentJob               `json:"agent_job"` // latest job, nil if none
 }
 
 var validLinkTypes = map[string]bool{"blocks": true, "is blocked by": true, "relates to": true}
@@ -288,6 +289,10 @@ func (s *server) getIssueDetail(key string) (*issueDetail, error) {
 	}
 
 	d.Comments, err = s.commentsFor(d.ID)
+	if err != nil {
+		return nil, err
+	}
+	d.AgentJob, err = s.latestAgentJob(d.ID)
 	return &d, err
 }
 

@@ -37,7 +37,7 @@ func migrate(d *sql.DB) error {
 	if err := d.QueryRow("PRAGMA user_version").Scan(&version); err != nil {
 		return err
 	}
-	if version >= 2 {
+	if version >= 3 {
 		return nil
 	}
 	tx, err := d.Begin()
@@ -54,12 +54,26 @@ func migrate(d *sql.DB) error {
 			return err
 		}
 	} else {
-		// v1 -> v2: issues.archived_at ("clear done" keeps history off the board).
-		if _, err := tx.Exec(`ALTER TABLE issues ADD COLUMN archived_at TEXT`); err != nil {
+		if version < 2 {
+			// v1 -> v2: issues.archived_at ("clear done" keeps history off the board).
+			if _, err := tx.Exec(`ALTER TABLE issues ADD COLUMN archived_at TEXT`); err != nil {
+				return err
+			}
+		}
+		// v2 -> v3: agent_jobs work queue for issue agents.
+		if _, err := tx.Exec(`CREATE TABLE agent_jobs (
+			id           INTEGER PRIMARY KEY,
+			issue_id     INTEGER NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+			status       TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued','running','done','failed')),
+			result       TEXT,
+			requested_by TEXT,
+			created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+			updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+		)`); err != nil {
 			return err
 		}
 	}
-	if _, err := tx.Exec("PRAGMA user_version = 2"); err != nil {
+	if _, err := tx.Exec("PRAGMA user_version = 3"); err != nil {
 		return err
 	}
 	return tx.Commit()

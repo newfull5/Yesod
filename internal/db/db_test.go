@@ -48,14 +48,20 @@ func TestMigrateV1AddsArchivedAt(t *testing.T) {
 
 	d, err := Open(path)
 	if err != nil {
-		t.Fatalf("open (migrate v1->v2): %v", err)
+		t.Fatalf("open (migrate v1->v3): %v", err)
 	}
 	defer d.Close()
 	var version int
-	if err := d.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 2 {
-		t.Errorf("user_version = %d, err %v, want 2", version, err)
+	if err := d.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 3 {
+		t.Errorf("user_version = %d, err %v, want 3", version, err)
 	}
 	if _, err := d.Exec(`UPDATE issues SET archived_at = datetime('now')`); err != nil {
 		t.Errorf("archived_at column missing after migration: %v", err)
+	}
+	if _, err := d.Exec(`INSERT INTO issues (id, title) VALUES (1, 'x')`); err != nil {
+		t.Fatalf("insert issue: %v", err)
+	}
+	if _, err := d.Exec(`INSERT INTO agent_jobs (issue_id) VALUES (1)`); err != nil {
+		t.Errorf("agent_jobs table missing after migration: %v", err)
 	}
 }
