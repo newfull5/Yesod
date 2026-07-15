@@ -602,8 +602,25 @@ function Agent({
               .catch((e: Error) => setErr(e.message))
           }
         >
-          {active ? 'Working…' : 'Start work'}
+          {job?.status === 'queued' ? 'Queued…' : job?.status === 'running' ? 'Working…' : 'Start work'}
         </button>
+        {active && (
+          <button
+            className="btn subtle"
+            onClick={() =>
+              // ponytail: cancel = failed + "canceled" result; a real 'canceled'
+              // status needs a table rebuild (CHECK constraint), not worth it yet
+              api(`/agent/jobs/${job.id}`, 'PATCH', { status: 'failed', result: 'canceled' })
+                .then(() => {
+                  setErr('')
+                  onChanged()
+                })
+                .catch((e: Error) => setErr(e.message))
+            }
+          >
+            Cancel
+          </button>
+        )}
       </div>
       {err && <p className="error">{err}</p>}
     </section>
