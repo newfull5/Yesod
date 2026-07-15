@@ -17,19 +17,21 @@ type agentJob struct {
 	IssueKey    string  `json:"issue_key"`
 	Status      string  `json:"status"`
 	Result      *string `json:"result"`
+	Log         *string `json:"log"`
 	RequestedBy *string `json:"requested_by"`
 	CreatedAt   string  `json:"created_at"`
 	UpdatedAt   string  `json:"updated_at"`
 }
 
-const agentJobSelect = `SELECT j.id, j.issue_id, i.key, j.status, j.result, j.requested_by, j.created_at, j.updated_at
+const agentJobSelect = `SELECT j.id, j.issue_id, i.key, j.status, j.result, j.log, j.requested_by, j.created_at, j.updated_at
 	FROM agent_jobs j JOIN issues i ON i.id = j.issue_id `
 
 func scanAgentJob(row interface{ Scan(...any) error }) (agentJob, error) {
 	var j agentJob
-	var result, requestedBy sql.NullString
-	err := row.Scan(&j.ID, &j.IssueID, &j.IssueKey, &j.Status, &result, &requestedBy, &j.CreatedAt, &j.UpdatedAt)
+	var result, jobLog, requestedBy sql.NullString
+	err := row.Scan(&j.ID, &j.IssueID, &j.IssueKey, &j.Status, &result, &jobLog, &requestedBy, &j.CreatedAt, &j.UpdatedAt)
 	j.Result = nullStr(result)
+	j.Log = nullStr(jobLog)
 	j.RequestedBy = nullStr(requestedBy)
 	return j, err
 }
@@ -124,25 +126,42 @@ func (s *server) patchAgentJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		Status string  `json:"status"`
-		Result *string `json:"result"`
+		Status    string  `json:"status"`
+		Result    *string `json:"result"`
+		LogAppend *string `json:"log_append"`
 	}
 	if !decode(w, r, &req) {
 		return
 	}
-	if !validJobStatus[req.Status] {
+	if req.Status == "" && req.Result == nil && req.LogAppend == nil {
+		writeErr(w, http.StatusBadRequest, "nothing to update: pass status, result and/or log_append")
+		return
+	}
+	if req.Status != "" && !validJobStatus[req.Status] {
 		writeErr(w, http.StatusBadRequest, "status must be one of queued, running, done, failed")
 		return
 	}
-	var res sql.Result
+	set := `updated_at = datetime('now')`
+	args := []any{}
+	if req.Status != "" {
+		set += `, status = ?`
+		args = append(args, req.Status)
+	}
+	if req.Result != nil {
+		set += `, result = ?`
+		args = append(args, *req.Result)
+	}
+	if req.LogAppend != nil {
+		set += `, log = COALESCE(log, '') || ?`
+		args = append(args, *req.LogAppend)
+	}
+	where := `id = ?`
+	args = append(args, id)
 	if req.Status == "running" {
 		// Atomic claim: only one runner can move queued -> running.
-		res, err = s.db.Exec(`UPDATE agent_jobs SET status = 'running', updated_at = datetime('now')
-			WHERE id = ? AND status = 'queued'`, id)
-	} else {
-		res, err = s.db.Exec(`UPDATE agent_jobs SET status = ?, result = COALESCE(?, result), updated_at = datetime('now')
-			WHERE id = ?`, req.Status, req.Result, id)
+		where += ` AND status = 'queued'`
 	}
+	res, err := s.db.Exec(`UPDATE agent_jobs SET `+set+` WHERE `+where, args...)
 	if err != nil {
 		dbErr(w, err)
 		return

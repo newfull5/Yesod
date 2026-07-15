@@ -87,6 +87,7 @@ CREATE TABLE agent_jobs (
     issue_id     INTEGER NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
     status       TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued','running','done','failed')),
     result       TEXT,                            -- short outcome note from the runner
+    log          TEXT,                            -- progress log, appended by the runner
     requested_by TEXT,                            -- person name; runners filter on it in multi-user setups
     created_at   TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at   TEXT NOT NULL DEFAULT (datetime('now'))

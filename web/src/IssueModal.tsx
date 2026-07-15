@@ -27,6 +27,14 @@ type Props = {
   onChanged: () => void
 }
 
+function modalSize(): { width: number; height: number } | null {
+  try {
+    return JSON.parse(localStorage.getItem('yesod.modalSize') || 'null')
+  } catch {
+    return null
+  }
+}
+
 export default function IssueModal({
   issueKey,
   projectId,
@@ -87,7 +95,22 @@ export default function IssueModal({
 
   return (
     <div className="backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal">
+      <div
+        className="modal"
+        style={modalSize() ?? undefined}
+        onMouseDown={(e) => {
+          // Persist size only after an actual corner drag (CSS resize handle
+          // sits in the bottom-right ~24px), not on content-driven changes.
+          const el = e.currentTarget
+          const r = el.getBoundingClientRect()
+          if (r.right - e.clientX > 24 || r.bottom - e.clientY > 24) return
+          const save = () => {
+            window.removeEventListener('mouseup', save)
+            localStorage.setItem('yesod.modalSize', JSON.stringify({ width: el.offsetWidth, height: el.offsetHeight }))
+          }
+          window.addEventListener('mouseup', save)
+        }}
+      >
         {!issue ? (
           <div className="center-msg">{err || 'Loading…'}</div>
         ) : (
@@ -622,6 +645,7 @@ function Agent({
           </button>
         )}
       </div>
+      {job?.log && <pre className="agent-log">{job.log}</pre>}
       {err && <p className="error">{err}</p>}
     </section>
   )

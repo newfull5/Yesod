@@ -30,6 +30,18 @@ func TestAgentJobLifecycle(t *testing.T) {
 	wantStatus(t, do(t, h, "PATCH", "/api/agent/jobs/1", map[string]any{"status": "running"}), http.StatusOK)
 	wantStatus(t, do(t, h, "PATCH", "/api/agent/jobs/1", map[string]any{"status": "running"}), http.StatusConflict)
 
+	// append progress log without touching status
+	rec = do(t, h, "PATCH", "/api/agent/jobs/1", map[string]any{"log_append": "reading issue\n"})
+	wantStatus(t, rec, http.StatusOK)
+	rec = do(t, h, "PATCH", "/api/agent/jobs/1", map[string]any{"log_append": "writing comment\n"})
+	job = parse[agentJob](t, rec)
+	if job.Log == nil || *job.Log != "reading issue\nwriting comment\n" {
+		t.Fatalf("log = %v, want appended lines", job.Log)
+	}
+
+	// empty patch is a 400
+	wantStatus(t, do(t, h, "PATCH", "/api/agent/jobs/1", map[string]any{}), http.StatusBadRequest)
+
 	// finish with a result
 	rec = do(t, h, "PATCH", "/api/agent/jobs/1", map[string]any{"status": "done", "result": "commented"})
 	wantStatus(t, rec, http.StatusOK)

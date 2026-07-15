@@ -37,7 +37,7 @@ func migrate(d *sql.DB) error {
 	if err := d.QueryRow("PRAGMA user_version").Scan(&version); err != nil {
 		return err
 	}
-	if version >= 3 {
+	if version >= 4 {
 		return nil
 	}
 	tx, err := d.Begin()
@@ -60,20 +60,28 @@ func migrate(d *sql.DB) error {
 				return err
 			}
 		}
-		// v2 -> v3: agent_jobs work queue for issue agents.
-		if _, err := tx.Exec(`CREATE TABLE agent_jobs (
-			id           INTEGER PRIMARY KEY,
-			issue_id     INTEGER NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
-			status       TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued','running','done','failed')),
-			result       TEXT,
-			requested_by TEXT,
-			created_at   TEXT NOT NULL DEFAULT (datetime('now')),
-			updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
-		)`); err != nil {
-			return err
+		if version < 3 {
+			// v2 -> v3 (+v4's log): agent_jobs work queue for issue agents.
+			if _, err := tx.Exec(`CREATE TABLE agent_jobs (
+				id           INTEGER PRIMARY KEY,
+				issue_id     INTEGER NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+				status       TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued','running','done','failed')),
+				result       TEXT,
+				log          TEXT,
+				requested_by TEXT,
+				created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+				updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+			)`); err != nil {
+				return err
+			}
+		} else {
+			// v3 -> v4: agent_jobs.log (runner progress, appended via PATCH).
+			if _, err := tx.Exec(`ALTER TABLE agent_jobs ADD COLUMN log TEXT`); err != nil {
+				return err
+			}
 		}
 	}
-	if _, err := tx.Exec("PRAGMA user_version = 3"); err != nil {
+	if _, err := tx.Exec("PRAGMA user_version = 4"); err != nil {
 		return err
 	}
 	return tx.Commit()

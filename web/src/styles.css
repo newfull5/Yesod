@@ -834,9 +834,13 @@ section {
   border-radius: 10px;
   width: 980px;
   max-width: 100%;
+  min-width: 520px;
+  min-height: 180px;
   padding: 20px 26px 28px;
   box-shadow: 0 30px 70px rgba(30, 20, 60, 0.3);
   animation: scaleIn 0.15s ease;
+  resize: both; /* native corner-drag resize; size persisted in IssueModal */
+  overflow: auto;
 }
 
 .modal-head {
@@ -1524,6 +1528,19 @@ section {
 
 .agent-chip.failed {
   color: var(--danger);
+}
+
+.agent-log {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  background: var(--bg);
+  border-radius: var(--radius);
+  font-size: 12px;
+  line-height: 1.5;
+  max-height: 220px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .agent-jobs {

@@ -48,6 +48,7 @@ export type AgentJob = {
   issue_key: string
   status: 'queued' | 'running' | 'done' | 'failed'
   result: string | null
+  log: string | null
   requested_by: string | null
   created_at: string
   updated_at: string
