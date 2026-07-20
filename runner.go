@@ -30,7 +30,9 @@ func runRunner(args []string) {
 
 	// The prompt is piped to the agent's stdin, so any CLI that reads a task
 	// from stdin works (codex exec, etc.) — override via YESOD_AGENT_CMD.
-	agentCmd := envOr("YESOD_AGENT_CMD", `claude -p --allowedTools "mcp__yesod__*"`)
+	// stream-json makes claude emit progress events as it works; the runner
+	// turns them into readable log lines so the web UI shows live progress.
+	agentCmd := envOr("YESOD_AGENT_CMD", `claude -p --output-format stream-json --verbose --allowedTools "mcp__yesod__*"`)
 
 	jar, _ := cookiejar.New(nil)
 	rc := &runnerClient{
@@ -160,7 +162,10 @@ func (c *runnerClient) runOnce(agentCmd string, timeout time.Duration) error {
 		sc := bufio.NewScanner(pr)
 		sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 		for sc.Scan() {
-			line := sc.Text()
+			line, show := formatAgentLine(sc.Text())
+			if !show {
+				continue
+			}
 			if strings.TrimSpace(line) != "" {
 				lastLine = line
 			}
@@ -222,6 +227,53 @@ func (c *runnerClient) buildPrompt(key string) (string, error) {
 		"When finished, post your findings as a single concise markdown comment on " + key +
 		" via the add_comment tool. Do not change the issue status.")
 	return b.String(), nil
+}
+
+// formatAgentLine turns one line of agent output into a log line for the web
+// UI. claude --output-format stream-json emits one JSON event per line; we
+// keep assistant text, tool calls ("→ tool") and the final result, and drop
+// the rest. Non-JSON lines (other CLIs) pass through unchanged.
+func formatAgentLine(raw string) (string, bool) {
+	if !strings.HasPrefix(strings.TrimSpace(raw), "{") {
+		return raw, strings.TrimSpace(raw) != ""
+	}
+	var ev struct {
+		Type    string `json:"type"`
+		Subtype string `json:"subtype"`
+		Result  string `json:"result"`
+		Message struct {
+			Content []struct {
+				Type string `json:"type"`
+				Text string `json:"text"`
+				Name string `json:"name"`
+			} `json:"content"`
+		} `json:"message"`
+	}
+	if err := json.Unmarshal([]byte(raw), &ev); err != nil {
+		return raw, true // JSON-looking but not; show as-is
+	}
+	switch ev.Type {
+	case "system":
+		if ev.Subtype == "init" {
+			return "agent session started", true
+		}
+	case "assistant":
+		var parts []string
+		for _, cb := range ev.Message.Content {
+			switch cb.Type {
+			case "text":
+				if t := strings.TrimSpace(cb.Text); t != "" {
+					parts = append(parts, t)
+				}
+			case "tool_use":
+				parts = append(parts, "→ "+cb.Name)
+			}
+		}
+		return strings.Join(parts, "\n"), len(parts) > 0
+	case "result":
+		return strings.TrimSpace(ev.Result), strings.TrimSpace(ev.Result) != ""
+	}
+	return "", false
 }
 
 func truncate(s string, n int) string {
