@@ -13,7 +13,7 @@ ARG TARGETOS
 ARG TARGETARCH
 COPY go.mod go.sum ./
 RUN go mod download
-COPY main.go ./
+COPY *.go ./
 COPY internal/ internal/
 COPY --from=web /src/web/dist web/dist
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w" -o /yesod .
