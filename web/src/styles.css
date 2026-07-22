@@ -1420,6 +1420,16 @@ section {
   color: var(--text);
 }
 
+.section-head .head-action {
+  margin-left: auto;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.backlog-section.sprint-active {
+  border-color: var(--accent);
+}
+
 .empty-hint {
   padding: 10px;
   border: 1px dashed var(--border-2);

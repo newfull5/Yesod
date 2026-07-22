@@ -154,7 +154,10 @@ export default function App() {
           <Dropdown
             value={filters.sprint != null ? String(filters.sprint) : ''}
             placeholder="All sprints"
-            options={[{ value: '', label: 'All sprints' }, ...sprints.map((s) => ({ value: String(s.id), label: s.name }))]}
+            options={[
+              { value: '', label: 'All sprints' },
+              ...sprints.map((s) => ({ value: String(s.id), label: s.name + (s.state === 'active' ? ' · active' : '') })),
+            ]}
             onChange={(v) => setFilters({ ...filters, sprint: v ? Number(v) : null })}
           />
           <button className="btn" onClick={() => setCreatingSprint(true)} disabled={projectId == null}>

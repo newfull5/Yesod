@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import { DndContext, PointerSensor, useDraggable, useDroppable, useSensor, useSensors } from '@dnd-kit/core'
 import type { DragEndEvent } from '@dnd-kit/core'
 import { api } from './api'
@@ -67,6 +68,35 @@ export default function Backlog({ projectId, sprints, version, onOpen, onChanged
     onOpen(key)
   }
 
+  // Only one sprint is active at a time: starting one closes any other active sprint.
+  async function startSprint(s: Sprint) {
+    try {
+      for (const other of sprints.filter((o) => o.state === 'active' && o.id !== s.id)) {
+        await api(`/sprints/${other.id}`, 'PATCH', { state: 'closed' })
+      }
+      await api(`/sprints/${s.id}`, 'PATCH', { state: 'active' })
+      onChanged()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Start sprint failed')
+    }
+  }
+
+  // Completing a sprint returns all of its issues to the backlog and closes it.
+  async function completeSprint(s: Sprint) {
+    const members = issues?.filter((i) => i.sprint_ids.includes(s.id)) ?? []
+    if (!window.confirm(`Complete ${s.name}? ${members.length} issue(s) will move back to the backlog.`)) return
+    try {
+      // ponytail: N sequential PATCHes from the loaded list; a bulk endpoint if sprints ever hold hundreds of issues
+      for (const i of members) {
+        await api(`/issues/${i.key}`, 'PATCH', { sprint_ids: i.sprint_ids.filter((id) => id !== s.id) })
+      }
+      await api(`/sprints/${s.id}`, 'PATCH', { state: 'closed' })
+      onChanged()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Complete sprint failed')
+    }
+  }
+
   if (!issues) return <div className="center-msg">{error || 'Loading backlog…'}</div>
 
   const active = issues.filter((i) => !i.archived_at)
@@ -87,19 +117,33 @@ export default function Backlog({ projectId, sprints, version, onOpen, onChanged
         </div>
       )}
       <DndContext sensors={sensors} onDragStart={() => (justDragged.current = true)} onDragEnd={onDragEnd}>
-        {sprints.map((s) => (
-          <Section
-            key={s.id}
-            droppableId={`s${s.id}`}
-            title={s.name}
-            subtitle={[s.state, s.start_date && s.end_date ? `${s.start_date} → ${s.end_date}` : null]
-              .filter(Boolean)
-              .join(' · ')}
-            rows={inSprint(s.id)}
-            from={s.id}
-            onOpen={open}
-          />
-        ))}
+        {sprints
+          .filter((s) => s.state !== 'closed')
+          .map((s) => (
+            <Section
+              key={s.id}
+              droppableId={`s${s.id}`}
+              title={s.name}
+              active={s.state === 'active'}
+              subtitle={[s.state, s.start_date && s.end_date ? `${s.start_date} → ${s.end_date}` : null]
+                .filter(Boolean)
+                .join(' · ')}
+              rows={inSprint(s.id)}
+              from={s.id}
+              onOpen={open}
+              action={
+                s.state === 'active' ? (
+                  <button className="btn subtle head-action" onClick={() => completeSprint(s)}>
+                    Complete sprint
+                  </button>
+                ) : (
+                  <button className="btn subtle head-action" onClick={() => startSprint(s)}>
+                    Start sprint
+                  </button>
+                )
+              }
+            />
+          ))}
         <Section droppableId="backlog" title="Backlog" subtitle="" rows={unassigned} from={null} onOpen={open} />
       </DndContext>
       {archived.length > 0 && <ArchiveSection rows={archived} onOpen={open} />}
@@ -218,6 +262,8 @@ function Section({
   rows,
   from,
   onOpen,
+  active,
+  action,
 }: {
   droppableId: string
   title: string
@@ -225,14 +271,20 @@ function Section({
   rows: Card[]
   from: number | null
   onOpen: (key: string) => void
+  active?: boolean
+  action?: ReactNode
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: droppableId })
   return (
-    <section className={'backlog-section' + (isOver ? ' drop-target' : '')} ref={setNodeRef}>
+    <section
+      className={'backlog-section' + (active ? ' sprint-active' : '') + (isOver ? ' drop-target' : '')}
+      ref={setNodeRef}
+    >
       <div className="section-head">
         <strong>{title}</strong>
         {subtitle && <span className="muted">{subtitle}</span>}
         <span className="count">{rows.length}</span>
+        {action}
       </div>
       {rows.length === 0 && <div className="muted empty-hint">Drop issues here</div>}
       {rows.map((c) => (
