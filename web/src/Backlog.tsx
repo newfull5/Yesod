@@ -4,7 +4,7 @@ import { DndContext, PointerSensor, useDraggable, useDroppable, useSensor, useSe
 import type { DragEndEvent } from '@dnd-kit/core'
 import { api } from './api'
 import type { Card, Detail, Sprint } from './api'
-import { Avatar, DueBadge, TypeIcon } from './ui'
+import { Avatar, DueBadge, StatusChip, TypeIcon } from './ui'
 
 type Props = {
   projectId: number
@@ -365,6 +365,7 @@ function Row({ card, from, onOpen }: { card: Card; from: number | null; onOpen: 
       <TypeIcon t={card.type} />
       <span className="key">{card.key}</span>
       <span className="row-title">{card.title}</span>
+      <StatusChip s={card.status} />
       <DueBadge due={card.due_date} />
       {card.assignee && <Avatar p={card.assignee} size={20} />}
     </div>

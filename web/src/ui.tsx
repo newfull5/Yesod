@@ -92,6 +92,17 @@ export function Avatar({ p, size = 24 }: { p: { name: string; avatar_color?: str
   )
 }
 
+export const COL_DOT: Record<string, string> = { todo: '#B0AAC7', in_progress: '#6741B7', done: '#2FAE73' }
+
+export function StatusChip({ s }: { s: { name: string; category: string } }) {
+  return (
+    <span className="status-chip">
+      <span className="col-dot" style={{ background: COL_DOT[s.category] || '#B0AAC7' }} />
+      {s.name}
+    </span>
+  )
+}
+
 export function dueUrgent(due: string): boolean {
   const today = new Date()
   today.setHours(0, 0, 0, 0)

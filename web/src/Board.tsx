@@ -14,7 +14,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { api } from './api'
 import type { Card, Column, Sprint } from './api'
 import type { Filters } from './App'
-import { Avatar, Dropdown, DueBadge, TypeIcon, typeColor } from './ui'
+import { Avatar, COL_DOT, Dropdown, DueBadge, TypeIcon, typeColor } from './ui'
 
 type Props = {
   projectId: number
@@ -234,8 +234,6 @@ export default function Board({ projectId, filters, sprints, version, onOpen, on
     </div>
   )
 }
-
-const COL_DOT: Record<string, string> = { todo: '#B0AAC7', in_progress: '#6741B7', done: '#2FAE73' }
 
 function BoardColumn({
   col,
