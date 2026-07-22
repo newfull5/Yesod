@@ -197,6 +197,7 @@ export default function App() {
           <Board
             projectId={projectId}
             filters={filters}
+            sprints={sprints}
             version={version}
             onOpen={setModalKey}
             onCreate={(statusId) => setCreating({ statusId })}

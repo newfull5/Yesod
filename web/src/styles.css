@@ -622,6 +622,19 @@ section {
   white-space: nowrap;
 }
 
+.sprint-chip {
+  background: var(--count-pill);
+  color: var(--muted);
+  border-radius: 20px;
+  padding: 1px 8px;
+  font-size: 10.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .due {
   font-size: 11.5px;
   color: var(--muted);

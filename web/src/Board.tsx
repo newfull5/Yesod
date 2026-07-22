@@ -12,16 +12,25 @@ import type { DragEndEvent, DragOverEvent, DragStartEvent } from '@dnd-kit/core'
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { api } from './api'
-import type { Card, Column } from './api'
+import type { Card, Column, Sprint } from './api'
 import type { Filters } from './App'
 import { Avatar, Dropdown, DueBadge, TypeIcon, typeColor } from './ui'
 
 type Props = {
   projectId: number
   filters: Filters
+  sprints: Sprint[]
   version: number
   onOpen: (key: string) => void
   onCreate: (statusId: number) => void
+}
+
+// Card chip shows which sprint (phase) an issue belongs to; prefer the
+// active sprint when an issue sits in several. "Sprint 1 — …" → "Sprint 1".
+function sprintLabel(card: Card, sprints: Sprint[]): string | null {
+  const mine = sprints.filter((s) => card.sprint_ids.includes(s.id))
+  const s = mine.find((x) => x.state === 'active') ?? mine.find((x) => x.state === 'future') ?? mine[0]
+  return s ? s.name.split('—')[0].trim() : null
 }
 
 function findCol(cols: Column[], id: string): Column | undefined {
@@ -29,7 +38,7 @@ function findCol(cols: Column[], id: string): Column | undefined {
   return cols.find((c) => c.issues.some((i) => i.key === id))
 }
 
-export default function Board({ projectId, filters, version, onOpen, onCreate }: Props) {
+export default function Board({ projectId, filters, sprints, version, onOpen, onCreate }: Props) {
   const [columns, setColumns] = useState<Column[] | null>(null)
   const [activeCard, setActiveCard] = useState<Card | null>(null)
   const [addAt, setAddAt] = useState<number | null>(null) // insert after this column index
@@ -189,6 +198,7 @@ export default function Board({ projectId, filters, version, onOpen, onCreate }:
               <BoardColumn
                 col={col}
                 cards={col.issues.filter(matches)}
+                sprints={sprints}
                 onOpen={open}
                 onCreate={() => onCreate(col.id)}
                 onClear={col.category === 'done' ? clearColumn(col.id) : undefined}
@@ -203,7 +213,7 @@ export default function Board({ projectId, filters, version, onOpen, onCreate }:
         <DragOverlay>
           {activeCard && (
             <div className="card overlay" style={{ borderLeftColor: typeColor(activeCard.type) }}>
-              <CardBody card={activeCard} />
+              <CardBody card={activeCard} sprint={sprintLabel(activeCard, sprints)} />
             </div>
           )}
         </DragOverlay>
@@ -230,6 +240,7 @@ const COL_DOT: Record<string, string> = { todo: '#B0AAC7', in_progress: '#6741B7
 function BoardColumn({
   col,
   cards,
+  sprints,
   onOpen,
   onCreate,
   onClear,
@@ -237,6 +248,7 @@ function BoardColumn({
 }: {
   col: Column
   cards: Card[]
+  sprints: Sprint[]
   onOpen: (key: string) => void
   onCreate: () => void
   onClear?: () => Promise<void>
@@ -261,7 +273,7 @@ function BoardColumn({
       <SortableContext items={cards.map((c) => c.key)} strategy={verticalListSortingStrategy}>
         <div ref={setNodeRef} className="col-cards">
           {cards.map((c) => (
-            <SortableCard key={c.key} card={c} onOpen={onOpen} />
+            <SortableCard key={c.key} card={c} sprint={sprintLabel(c, sprints)} onOpen={onOpen} />
           ))}
         </div>
       </SortableContext>
@@ -432,7 +444,7 @@ function AddColumnDialog({ onClose, onAdd }: { onClose: () => void; onAdd: (name
   )
 }
 
-function SortableCard({ card, onOpen }: { card: Card; onOpen: (key: string) => void }) {
+function SortableCard({ card, sprint, onOpen }: { card: Card; sprint: string | null; onOpen: (key: string) => void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.key })
   return (
     <div
@@ -448,18 +460,19 @@ function SortableCard({ card, onOpen }: { card: Card; onOpen: (key: string) => v
       {...listeners}
       onClick={() => onOpen(card.key)}
     >
-      <CardBody card={card} />
+      <CardBody card={card} sprint={sprint} />
     </div>
   )
 }
 
-function CardBody({ card }: { card: Card }) {
+function CardBody({ card, sprint }: { card: Card; sprint: string | null }) {
   return (
     <>
       <div className="card-title">{card.title}</div>
       <div className="card-foot">
         <TypeIcon t={card.type} />
         <span className="key">{card.key}</span>
+        {sprint && <span className="sprint-chip">{sprint}</span>}
         <DueBadge due={card.due_date} />
         <span className="spacer" />
         {card.assignee && <Avatar p={card.assignee} size={22} />}
