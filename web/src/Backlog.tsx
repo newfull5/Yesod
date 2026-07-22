@@ -81,13 +81,17 @@ export default function Backlog({ projectId, sprints, version, onOpen, onChanged
     }
   }
 
-  // Completing a sprint returns all of its issues to the backlog and closes it.
+  // Completing a sprint moves its unfinished issues back to the backlog and
+  // closes it; done issues stay in the sprint as its history.
   async function completeSprint(s: Sprint) {
     const members = issues?.filter((i) => i.sprint_ids.includes(s.id)) ?? []
-    if (!window.confirm(`Complete ${s.name}? ${members.length} issue(s) will move back to the backlog.`)) return
+    const unfinished = members.filter((i) => i.status.category !== 'done')
+    const done = members.length - unfinished.length
+    const msg = `Complete ${s.name}? ${unfinished.length} unfinished issue(s) move back to the backlog; ${done} done issue(s) stay as its history.`
+    if (!window.confirm(msg)) return
     try {
       // ponytail: N sequential PATCHes from the loaded list; a bulk endpoint if sprints ever hold hundreds of issues
-      for (const i of members) {
+      for (const i of unfinished) {
         await api(`/issues/${i.key}`, 'PATCH', { sprint_ids: i.sprint_ids.filter((id) => id !== s.id) })
       }
       await api(`/sprints/${s.id}`, 'PATCH', { state: 'closed' })
@@ -146,6 +150,9 @@ export default function Backlog({ projectId, sprints, version, onOpen, onChanged
           ))}
         <Section droppableId="backlog" title="Backlog" subtitle="" rows={unassigned} from={null} onOpen={open} />
       </DndContext>
+      {sprints.some((s) => s.state === 'closed') && (
+        <HistorySection sprints={sprints.filter((s) => s.state === 'closed')} issues={issues} onOpen={open} />
+      )}
       {archived.length > 0 && <ArchiveSection rows={archived} onOpen={open} />}
       {creatingSprint && (
         <NewSprint
@@ -217,6 +224,62 @@ export function NewSprint({ projectId, onClose, onCreated }: { projectId: number
   )
 }
 
+function Chevron({ open }: { open: boolean }) {
+  return (
+    <svg
+      className={'chevron' + (open ? ' open' : '')}
+      width="12"
+      height="12"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M6 3l5 5-5 5" />
+    </svg>
+  )
+}
+
+// Completed sprints and the done issues that stayed in them. Read-only record.
+function HistorySection({ sprints, issues, onOpen }: { sprints: Sprint[]; issues: Card[]; onOpen: (key: string) => void }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <section className="backlog-section archive">
+      <button className="section-head archive-toggle" onClick={() => setOpen(!open)}>
+        <Chevron open={open} />
+        <strong>Sprint history</strong>
+        <span className="muted">completed sprints</span>
+        <span className="count">{sprints.length}</span>
+      </button>
+      {open &&
+        sprints.map((s) => {
+          const rows = issues.filter((i) => i.sprint_ids.includes(s.id))
+          return (
+            <div key={s.id} className="history-sprint">
+              <div className="section-head">
+                <strong>{s.name}</strong>
+                {s.start_date && s.end_date && <span className="muted">{`${s.start_date} → ${s.end_date}`}</span>}
+                <span className="count">{rows.length}</span>
+              </div>
+              {rows.length === 0 && <div className="muted empty-hint">No issues recorded</div>}
+              {rows.map((c) => (
+                <div key={c.key} className="backlog-row archived" onClick={() => onOpen(c.key)}>
+                  <TypeIcon t={c.type} />
+                  <span className="key">{c.key}</span>
+                  <span className="row-title">{c.title}</span>
+                  <span className="muted">{c.status.name}</span>
+                  {c.assignee && <Avatar p={c.assignee} size={20} />}
+                </div>
+              ))}
+            </div>
+          )
+        })}
+    </section>
+  )
+}
+
 // Work history: issues archived via the board's "Clear" button. Read-only
 // list (no drag) — open an issue and Restore to bring it back.
 function ArchiveSection({ rows, onOpen }: { rows: Card[]; onOpen: (key: string) => void }) {
@@ -224,19 +287,7 @@ function ArchiveSection({ rows, onOpen }: { rows: Card[]; onOpen: (key: string) 
   return (
     <section className="backlog-section archive">
       <button className="section-head archive-toggle" onClick={() => setOpen(!open)}>
-        <svg
-          className={'chevron' + (open ? ' open' : '')}
-          width="12"
-          height="12"
-          viewBox="0 0 16 16"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M6 3l5 5-5 5" />
-        </svg>
+        <Chevron open={open} />
         <strong>Archive</strong>
         <span className="muted">cleared from the board</span>
         <span className="count">{rows.length}</span>

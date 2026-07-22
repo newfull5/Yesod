@@ -156,7 +156,9 @@ export default function App() {
             placeholder="All sprints"
             options={[
               { value: '', label: 'All sprints' },
-              ...sprints.map((s) => ({ value: String(s.id), label: s.name + (s.state === 'active' ? ' · active' : '') })),
+              ...sprints
+                .filter((s) => s.state !== 'closed')
+                .map((s) => ({ value: String(s.id), label: s.name + (s.state === 'active' ? ' · active' : '') })),
             ]}
             onChange={(v) => setFilters({ ...filters, sprint: v ? Number(v) : null })}
           />

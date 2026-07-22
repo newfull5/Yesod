@@ -1430,6 +1430,14 @@ section {
   border-color: var(--accent);
 }
 
+.history-sprint {
+  margin: 6px 0 12px 22px;
+}
+
+.history-sprint .section-head {
+  padding-bottom: 6px;
+}
+
 .empty-hint {
   padding: 10px;
   border: 1px dashed var(--border-2);
